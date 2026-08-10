@@ -1,0 +1,24 @@
+name: Foundation Validation
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  opa-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup OPA
+        uses: open-policy-agent/setup-opa@v2
+        with:
+          version: latest
+
+      - name: Run OPA Unit Tests
+        run: opa test policies/ -v --coverage
+
+      - name: Run OPA Unit Tests (with coverage threshold)
+        run: opa test policies/ --threshold 80
