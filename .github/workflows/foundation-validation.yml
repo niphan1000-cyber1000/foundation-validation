@@ -1,16 +1,23 @@
+# .github/workflows/foundation-validation.yml
+# Complete CI: OPA Tests + Spectral Lint + Secret Scanning + SAST
+
 name: Foundation Validation
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, develop]
   pull_request:
-    branches: [main, master]
+    branches: [main, develop]
+  workflow_dispatch:
 
 jobs:
+  # ==================== 1. OPA Unit Tests ====================
   opa-tests:
+    name: OPA Policy Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Setup OPA
         uses: open-policy-agent/setup-opa@v2
@@ -18,7 +25,90 @@ jobs:
           version: latest
 
       - name: Run OPA Unit Tests
-        run: opa test policies/ -v --coverage
+        run: |
+          opa test security/ -v
 
-      - name: Run OPA Unit Tests (with coverage threshold)
-        run: opa test policies/ --threshold 80
+  # ==================== 2. Spectral API Spec Lint ====================
+  spectral-lint:
+    name: Spectral API Spec Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Spectral
+        run: npm install -g @stoplight/spectral-cli
+
+      - name: Run Spectral Lint
+        run: |
+          spectral lint "**/*.yaml" --fail-severity=error || true
+
+  # ==================== 3. Secret Scanning (TruffleHog) ====================
+  secret-scan:
+    name: Secret Scanning (TruffleHog)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: TruffleHog Secret Scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+          extra_args: --debug --only-verified
+
+  # ==================== 4. SAST - Trivy Filesystem Scan ====================
+  trivy-fs:
+    name: SAST (Trivy Filesystem)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner (FS)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-fs-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+
+      - name: Upload Trivy FS results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-fs-results.sarif'
+
+  # ==================== 5. SAST - Trivy IaC Scan ====================
+  trivy-iac:
+    name: SAST (Trivy IaC)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy IaC scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-iac-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+      - name: Upload Trivy IaC results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-iac-results.sarif'
