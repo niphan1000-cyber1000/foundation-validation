@@ -1,0 +1,35 @@
+extends:
+  - "spectral:oas"
+
+rules:
+  operation-operationId:
+    description: Every operation must have an operationId
+    given: "$.paths.*[?( @property === 'get' || @property === 'put' || @property === 'post' || @property === 'delete' || @property === 'patch' )]"
+    then:
+      field: operationId
+      function: truthy
+    severity: error
+
+  operation-tags:
+    description: Every operation must have at least one tag
+    given: "$.paths.*[?( @property === 'get' || @property === 'put' || @property === 'post' || @property === 'delete' || @property === 'patch' )]"
+    then:
+      field: tags
+      function: truthy
+    severity: error
+
+  must-have-x-api-id:
+    description: Every operation must have x-api-id extension
+    given: "$.paths.*[?( @property === 'get' || @property === 'put' || @property === 'post' || @property === 'delete' || @property === 'patch' )]"
+    then:
+      field: x-api-id
+      function: truthy
+    severity: error
+
+  must-have-x-traceability:
+    description: Every operation should have x-traceability
+    given: "$.paths.*[?( @property === 'get' || @property === 'put' || @property === 'post' || @property === 'delete' || @property === 'patch' )]"
+    then:
+      field: x-traceability
+      function: truthy
+    severity: warn

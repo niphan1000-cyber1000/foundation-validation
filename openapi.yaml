@@ -1,0 +1,154 @@
+openapi: 3.0.3
+info:
+  title: Foundation Validation API
+  description: API for testing Spectral rules and validation
+  version: 1.0.0
+  contact:
+    name: API Team
+    email: api@example.com
+    url: https://api.example.com/contact
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.example.com/v1
+    description: Production server endpoint
+
+tags:
+  - name: Users
+    description: User management operations
+
+paths:
+  /v1/users:
+    get:
+      operationId: listUsers
+      summary: List all users
+      description: Returns a list of all registered users in the system
+      tags:
+        - Users
+      x-api-id: api-001
+      x-traceability: trace-001
+      responses:
+        '200':
+          description: Successful response with list of users
+          content:
+            application/json:
+              schema:
+                type: array
+                description: Array of user objects
+                items:
+                  $ref: '#/components/schemas/User'
+
+    post:
+      operationId: createUser
+      summary: Create a new user
+      description: Creates a new user account in the system
+      tags:
+        - Users
+      x-api-id: api-002
+      x-traceability: trace-002
+      requestBody:
+        required: true
+        description: User creation request payload
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserInput'
+      responses:
+        '201':
+          description: User created successfully
+        '400':
+          description: Invalid input data provided
+
+  /v1/users/{userId}:
+    get:
+      operationId: getUserById
+      summary: Get user by ID
+      description: Returns a single user by their unique identifier
+      tags:
+        - Users
+      x-api-id: api-003
+      x-traceability: trace-003
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: The unique identifier of the user
+          schema:
+            type: string
+            description: User ID string
+      responses:
+        '200':
+          description: User found and returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: User not found in the system
+
+    delete:
+      operationId: deleteUser
+      summary: Delete user
+      description: Permanently deletes a user account from the system
+      tags:
+        - Users
+      x-api-id: api-004
+      x-traceability: trace-004
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: The unique identifier of the user to delete
+          schema:
+            type: string
+            description: User ID string
+      responses:
+        '204':
+          description: User deleted successfully
+
+components:
+  schemas:
+    User:
+      type: object
+      description: Represents a user entity in the system
+      required:
+        - id
+        - email
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the user
+          example: "usr-12345"
+        email:
+          type: string
+          format: email
+          description: Email address of the user
+          example: "user@example.com"
+        name:
+          type: string
+          description: Full name of the user
+          example: "John Doe"
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the account was created
+          example: "2024-01-15T10:30:00Z"
+
+    UserInput:
+      type: object
+      description: Input data required to create a new user
+      required:
+        - email
+        - name
+      properties:
+        email:
+          type: string
+          format: email
+          description: Email address for the new user
+          example: "user@example.com"
+        name:
+          type: string
+          description: Full name of the new user
+          example: "John Doe"
