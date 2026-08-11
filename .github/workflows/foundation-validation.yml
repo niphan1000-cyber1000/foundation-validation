@@ -46,7 +46,7 @@ jobs:
 
       - name: Run Spectral Lint
         run: |
-          spectral lint "**/*.yaml" --fail-severity=error
+          spectral lint openapi.yaml --ruleset .spectral.yaml --fail-severity=error
 
   # ==================== 3. Secret Scanning (TruffleHog) ====================
   secret-scan:
