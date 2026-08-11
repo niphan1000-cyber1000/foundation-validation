@@ -46,7 +46,7 @@ jobs:
 
       - name: Run Spectral Lint
         run: |
-          spectral lint "**/*.yaml" --fail-severity=error || true
+          spectral lint "**/*.yaml" --fail-severity=error
 
   # ==================== 3. Secret Scanning (TruffleHog) ====================
   secret-scan:
@@ -58,12 +58,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: TruffleHog Secret Scan
+      - name: TruffleHog Secret Scan (Pull Request)
+        if: github.event_name == 'pull_request'
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
-          base: main
-          head: HEAD
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
+          extra_args: --debug --only-verified
+
+      - name: TruffleHog Secret Scan (Push / Manual)
+        if: github.event_name != 'pull_request'
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
           extra_args: --debug --only-verified
 
   # ==================== 4. SAST - Trivy Filesystem Scan ====================
@@ -105,7 +113,8 @@ jobs:
           scan-ref: '.'
           format: 'sarif'
           output: 'trivy-iac-results.sarif'
-          severity: 'CRITICAL,HIGH,MEDIUM'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
 
       - name: Upload Trivy IaC results
         uses: github/codeql-action/upload-sarif@v3
