@@ -1,0 +1,24 @@
+# .github/workflows/call-foundation-validation.yml
+# วางไฟล์นี้ใน repo อื่น ๆ ที่ต้องการใช้มาตรฐาน CI เดียวกับ foundation-validation
+# ไม่ต้อง copy policy/rule ไฟล์ใด ๆ เลย — เรียก workflow จาก repo กลางโดยตรง
+
+name: Foundation Validation (Shared)
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+# ต้องประกาศ permissions ในระดับ caller ด้วย เพราะ reusable workflow
+# ไม่สามารถขอสิทธิ์เกินกว่าที่ caller ให้ไว้ได้
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  run-foundation-validation:
+    # เปลี่ยน niphan1000-cyber1000 เป็น owner จริงถ้าย้าย org
+    # เปลี่ยน @main เป็น @v1 หรือ tag เวอร์ชันที่ fix ไว้ ถ้าต้องการความเสถียรสูงสุด
+    uses: niphan1000-cyber1000/foundation-validation/.github/workflows/foundation-validation.yml@main
