@@ -170,4 +170,3 @@ components:
           type: string
           description: Full name for the new user
           example: "John Doe"
-invalid_spectral_key: true
