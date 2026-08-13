@@ -1,4 +1,4 @@
-# .github/workflows/foundation-validation.yml
+﻿# .github/workflows/foundation-validation.yml
 # Complete CI: OPA Tests + Spectral Lint + Secret Scanning + SAST
 
 name: Foundation Validation
@@ -10,8 +10,6 @@ on:
     branches: [main, develop]
   workflow_dispatch:
   workflow_call:
-    # ทำให้ repo อื่นเรียกใช้ workflow ชุดนี้ได้โดยตรง (Reusable Workflow)
-    # ไม่ต้องประกาศ inputs/secrets เพิ่ม เพราะทุก job ทำงานแบบ self-contained อยู่แล้ว
 
 permissions:
   contents: read
@@ -24,10 +22,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup OPA
-        uses: open-policy-agent/setup-opa@v2
+        uses: open-policy-agent/setup-opa@331f41d9c57d76b1076f2fdcc6552ea6488d8b67 # v2.2.0
         with:
           version: latest
 
@@ -41,10 +39,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: '20'
 
@@ -61,7 +59,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
 
@@ -87,10 +85,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Run Trivy vulnerability scanner (FS)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947b394d2dd8c87dbb0 # v0.29.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -100,7 +98,7 @@ jobs:
           exit-code: '1'
 
       - name: Upload Trivy FS results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@f603c535937990092d3121ef378fa4209581f181 # v3.28.10
         if: always()
         with:
           sarif_file: 'trivy-fs-results.sarif'
@@ -111,10 +109,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Run Trivy IaC scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947b394d2dd8c87dbb0 # v0.29.0
         with:
           scan-type: 'config'
           scan-ref: '.'
@@ -124,7 +122,7 @@ jobs:
           exit-code: '1'
 
       - name: Upload Trivy IaC results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@f603c535937990092d3121ef378fa4209581f181 # v3.28.10
         if: always()
         with:
           sarif_file: 'trivy-iac-results.sarif'
