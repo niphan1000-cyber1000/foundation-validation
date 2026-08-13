@@ -19,7 +19,6 @@ tags:
   - name: Users
     description: User management operations
 
-# 🔒 Global Security Enforcement
 security:
   - BearerAuth: []
 
@@ -121,7 +120,6 @@ paths:
           description: Unauthorized - Missing or invalid Bearer token
 
 components:
-  # 🔐 Security Schemes Definition
   securitySchemes:
     BearerAuth:
       type: http
