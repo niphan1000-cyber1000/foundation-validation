@@ -63,11 +63,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 50
 
       - name: TruffleHog Secret Scan (Pull Request)
         if: github.event_name == 'pull_request'
-        uses: trufflesecurity/trufflehog@main
+        uses: trufflesecurity/trufflehog@v3.82.13
         with:
           path: ./
           base: ${{ github.event.pull_request.base.sha }}
@@ -76,7 +76,7 @@ jobs:
 
       - name: TruffleHog Secret Scan (Push / Manual)
         if: github.event_name != 'pull_request'
-        uses: trufflesecurity/trufflehog@main
+        uses: trufflesecurity/trufflehog@v3.82.13
         with:
           path: ./
           extra_args: --debug
