@@ -1,4 +1,4 @@
-openapi: 3.0.3
+﻿openapi: 3.0.3
 info:
   title: Foundation Validation API
   description: API for testing Spectral rules and validation
@@ -18,6 +18,10 @@ servers:
 tags:
   - name: Users
     description: User management operations
+
+# 🔒 Global Security Enforcement
+security:
+  - BearerAuth: []
 
 paths:
   /v1/users:
@@ -39,6 +43,8 @@ paths:
                 description: Array of user objects
                 items:
                   $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized - Missing or invalid Bearer token
 
     post:
       operationId: createUser
@@ -60,6 +66,8 @@ paths:
           description: User created successfully
         '400':
           description: Invalid input data provided
+        '401':
+          description: Unauthorized - Missing or invalid Bearer token
 
   /v1/users/{userId}:
     get:
@@ -85,6 +93,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized - Missing or invalid Bearer token
         '404':
           description: User not found in the system
 
@@ -107,8 +117,18 @@ paths:
       responses:
         '204':
           description: User deleted successfully
+        '401':
+          description: Unauthorized - Missing or invalid Bearer token
 
 components:
+  # 🔐 Security Schemes Definition
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Enter HTTP Bearer JWT token in format 'Bearer <token>'
+
   schemas:
     User:
       type: object
@@ -150,5 +170,5 @@ components:
           example: "user@example.com"
         name:
           type: string
-          description: Full name of the new user
+          description: Full name for the new user
           example: "John Doe"
