@@ -1,4 +1,4 @@
-﻿# .github/workflows/foundation-validation.yml
+# .github/workflows/foundation-validation.yml
 # Complete CI: OPA Tests + Spectral Lint + Secret Scanning + SAST
 
 name: Foundation Validation
@@ -10,8 +10,8 @@ on:
     branches: [main, develop]
   workflow_dispatch:
   workflow_call:
-    # à¸—à¸³à¹ƒà¸«à¹‰ repo à¸­à¸·à¹ˆà¸™à¹€à¸£à¸µà¸¢à¸à¹ƒà¸Šà¹‰ workflow à¸Šà¸¸à¸”à¸™à¸µà¹‰à¹„à¸”à¹‰à¹‚à¸”à¸¢à¸•à¸£à¸‡ (Reusable Workflow)
-    # à¹„à¸¡à¹ˆà¸•à¹‰à¸­à¸‡à¸›à¸£à¸°à¸à¸²à¸¨ inputs/secrets à¹€à¸žà¸´à¹ˆà¸¡ à¹€à¸žà¸£à¸²à¸°à¸—à¸¸à¸ job à¸—à¸³à¸‡à¸²à¸™à¹à¸šà¸š self-contained à¸­à¸¢à¸¹à¹ˆà¹à¸¥à¹‰à¸§
+    # ทำให้ repo อื่นเรียกใช้ workflow ชุดนี้ได้โดยตรง (Reusable Workflow)
+    # ไม่ต้องประกาศ inputs/secrets เพิ่ม เพราะทุก job ทำงานแบบ self-contained อยู่แล้ว
 
 permissions:
   contents: read
@@ -24,10 +24,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@v4
 
       - name: Setup OPA
-        uses: open-policy-agent/setup-opa@2fbe0d3f2390a8a6142171c6999c086c91a0c44c
+        uses: open-policy-agent/setup-opa@v2
         with:
           version: latest
 
@@ -41,10 +41,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@v4
 
       - name: Setup Node
-        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
 
@@ -61,7 +61,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -87,10 +87,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@v4
 
       - name: Run Trivy vulnerability scanner (FS)
-        uses: aquasecurity/trivy-action@18f2510ee396bbf400e26a2f77ecc309a63212fb
+        uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -111,10 +111,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@v4
 
       - name: Run Trivy IaC scanner
-        uses: aquasecurity/trivy-action@18f2510ee396bbf400e26a2f77ecc309a63212fb
+        uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'config'
           scan-ref: '.'

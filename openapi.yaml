@@ -152,14 +152,3 @@ components:
           type: string
           description: Full name of the new user
           example: "John Doe"
-
-security:
-  - BearerAuth: []
-
-components:
-  securitySchemes:
-    BearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-      description: Enter your JWT Bearer token
