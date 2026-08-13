@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup OPA
-        uses: open-policy-agent/setup-opa@331f41d9c57d76b1076f2fdcc6552ea6488d8b67 # v2.2.0
+        uses: open-policy-agent/setup-opa@b72e51a6136be3cdd11831c77174e14f6b216440 # v2.1.0
         with:
           version: latest
 
@@ -98,7 +98,7 @@ jobs:
           exit-code: '1'
 
       - name: Upload Trivy FS results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@f603c535937990092d3121ef378fa4209581f181 # v3.28.10
+        uses: github/codeql-action/upload-sarif@dd7440b688376269dded0195e3efbfb2f7041fdd # v3.28.10
         if: always()
         with:
           sarif_file: 'trivy-fs-results.sarif'
@@ -122,7 +122,7 @@ jobs:
           exit-code: '1'
 
       - name: Upload Trivy IaC results
-        uses: github/codeql-action/upload-sarif@f603c535937990092d3121ef378fa4209581f181 # v3.28.10
+        uses: github/codeql-action/upload-sarif@dd7440b688376269dded0195e3efbfb2f7041fdd # v3.28.10
         if: always()
         with:
           sarif_file: 'trivy-iac-results.sarif'
