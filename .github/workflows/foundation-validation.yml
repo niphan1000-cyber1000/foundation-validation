@@ -31,6 +31,10 @@ jobs:
         run: |
           python3 -m unittest discover -s validators/policy/tests -p "test_*.py"
 
+      - name: Run Aggregator Integration Tests
+        run: |
+          python3 -m unittest discover -s validators/tests -p "test_*.py"
+
       - name: Run Aggregator Master Gate CLI
         run: |
           python3 validators/run_all.py --output validation-result.json
