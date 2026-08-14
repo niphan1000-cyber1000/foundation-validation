@@ -19,22 +19,14 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Run Schema Engine Unit Tests
+      - name: Run All Domain Unit & Integration Tests
+        env:
+          PYTHONPATH: .
         run: |
-          python3 -m unittest discover -s validators/schema/tests -p "test_*.py"
-
-      - name: Run OpenAPI Engine Unit Tests
-        run: |
-          python3 -m unittest discover -s validators/openapi/tests -p "test_*.py"
-
-      - name: Run Policy Engine Unit Tests
-        run: |
-          python3 -m unittest discover -s validators/policy/tests -p "test_*.py"
-
-      - name: Run Aggregator Integration Tests
-        run: |
-          python3 -m unittest discover -s validators/tests -p "test_*.py"
+          python3 -m unittest discover -s validators -p "test_*.py"
 
       - name: Run Aggregator Master Gate CLI
+        env:
+          PYTHONPATH: .
         run: |
           python3 validators/run_all.py --output validation-result.json
