@@ -1,0 +1,26 @@
+﻿{
+  "version": "1.0.0",
+  "severities": ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
+  "domains": {
+    "schema": {
+      "prefix": "SCH",
+      "category": "schema",
+      "description": "JSON Contract Schema validation rules"
+    },
+    "openapi": {
+      "prefix": "OAS",
+      "category": "openapi",
+      "description": "API Linting & Structure validation rules"
+    },
+    "policy": {
+      "prefix": "POL",
+      "category": "policy",
+      "description": "Open Policy Agent / Rego governance rules"
+    },
+    "security": {
+      "prefix": "SEC",
+      "category": "security",
+      "description": "Security posture and compliance rules"
+    }
+  }
+}

@@ -1,181 +1,75 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://foundation-validation.cloudforge.internal/schemas/validation-result.schema.json",
-  "title": "ValidationRun",
-  "description": "A single execution instance of a validation request, including its gate result once complete. Mirrors the ValidationRun component in openapi.yaml (GET /v1/validations/{id}).",
+﻿{
+  "\": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ValidationResultContract",
   "type": "object",
-  "required": ["id", "status", "target", "domains", "created_at"],
-  "additionalProperties": false,
+  "required": ["execution", "status", "summary", "findings", "evidence"],
   "properties": {
-    "id": {
-      "type": "string",
-      "minLength": 1,
-      "examples": ["val-8f3c1a20"]
+    "execution": {
+      "type": "object",
+      "required": ["execution_id", "timestamp", "platform_version", "environment"],
+      "properties": {
+        "execution_id": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "platform_version": { "type": "string" },
+        "environment": { "type": "string" }
+      }
     },
-    "status": { "$ref": "#/$defs/RunStatus" },
-    "target": { "$ref": "#/$defs/Target" },
-    "domains": {
+    "status": {
+      "type": "string",
+      "enum": ["PASSED", "FAILED", "ERROR"]
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total_findings", "critical", "high", "medium", "low"],
+      "properties": {
+        "total_findings": { "type": "integer", "minimum": 0 },
+        "critical": { "type": "integer", "minimum": 0 },
+        "high": { "type": "integer", "minimum": 0 },
+        "medium": { "type": "integer", "minimum": 0 },
+        "low": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "findings": {
       "type": "array",
-      "items": { "$ref": "#/$defs/Domain" },
-      "minItems": 1,
-      "uniqueItems": true
-    },
-    "ruleset_version": {
-      "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$",
-      "examples": ["0.1.0"]
-    },
-    "requested_by": {
-      "type": "string",
-      "examples": ["ci:github-actions"]
-    },
-    "context": {
-      "type": "object",
-      "additionalProperties": true
-    },
-    "gate_result": {
-      "description": "Present once the run reaches PASSED or FAILED status; null while REQUESTED, QUEUED, or RUNNING.",
-      "oneOf": [
-        { "$ref": "#/$defs/GateResult" },
-        { "type": "null" }
-      ]
-    },
-    "created_at": {
-      "type": "string",
-      "format": "date-time",
-      "examples": ["2026-08-13T09:15:00Z"]
-    },
-    "updated_at": {
-      "type": "string",
-      "format": "date-time",
-      "examples": ["2026-08-13T09:16:42Z"]
-    }
-  },
-  "$defs": {
-    "Domain": {
-      "type": "string",
-      "description": "Validation domain, aligned with the validators/ folder structure.",
-      "enum": [
-        "schema",
-        "openapi",
-        "security",
-        "policy",
-        "governance",
-        "traceability"
-      ]
-    },
-    "Severity": {
-      "type": "string",
-      "description": "Rule severity level, per the Foundation Validation Spec Severity Model.",
-      "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
-    },
-    "RunStatus": {
-      "type": "string",
-      "description": "Lifecycle status of a validation run.",
-      "enum": [
-        "REQUESTED",
-        "QUEUED",
-        "RUNNING",
-        "PASSED",
-        "FAILED",
-        "ERRORED",
-        "ARCHIVED"
-      ]
-    },
-    "GateStatus": {
-      "type": "string",
-      "description": "Final gate decision, only present once a run has completed.",
-      "enum": ["PASSED", "FAILED"]
-    },
-    "TargetType": {
-      "type": "string",
-      "enum": [
-        "repository",
-        "commit",
-        "artifact",
-        "api_contract",
-        "infrastructure_config"
-      ]
-    },
-    "Target": {
-      "type": "object",
-      "required": ["type", "reference"],
-      "additionalProperties": false,
-      "properties": {
-        "type": { "$ref": "#/$defs/TargetType" },
-        "reference": { "type": "string", "minLength": 1 },
-        "location": { "type": "string" }
-      }
-    },
-    "Finding": {
-      "type": "object",
-      "description": "Result of evaluating a single rule against the target. Every finding must reference at least one evidence record, per the Foundation Validation Spec Evidence Model (Section 5).",
-      "required": ["finding_id", "rule_id", "domain", "severity", "status", "evidence_ids"],
-      "additionalProperties": false,
-      "properties": {
-        "finding_id": { "type": "string", "examples": ["fnd-0007"] },
-        "rule_id": { "type": "string", "examples": ["SEC-003"] },
-        "domain": { "$ref": "#/$defs/Domain" },
-        "severity": { "$ref": "#/$defs/Severity" },
-        "status": {
-          "type": "string",
-          "enum": ["pass", "fail"]
-        },
-        "message": {
-          "type": "string",
-          "examples": ["Hardcoded secret detected in security/policy.rego"]
-        },
-        "evidence_ids": {
-          "type": "array",
-          "description": "Evidence records that support this finding. Must contain at least one entry per the Evidence Model.",
-          "items": { "type": "string" },
-          "minItems": 1,
-          "examples": [["ev-0012", "ev-0013"]]
-        }
-      }
-    },
-    "GateResult": {
-      "type": "object",
-      "description": "Summary of the gate decision for a completed validation run, evaluated against the Foundation Validation Spec Exit Criteria (Section 7).",
-      "required": ["status", "summary", "findings"],
-      "additionalProperties": false,
-      "properties": {
-        "status": { "$ref": "#/$defs/GateStatus" },
-        "summary": {
-          "type": "object",
-          "description": "Count of findings per severity level.",
-          "required": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"],
-          "additionalProperties": false,
-          "properties": {
-            "CRITICAL": { "type": "integer", "minimum": 0 },
-            "HIGH": { "type": "integer", "minimum": 0 },
-            "MEDIUM": { "type": "integer", "minimum": 0 },
-            "LOW": { "type": "integer", "minimum": 0 },
-            "INFO": { "type": "integer", "minimum": 0 }
-          }
-        },
-        "findings": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/Finding" }
-        }
-      },
-      "allOf": [
-        {
-          "description": "Exit Criteria #1 and #2: a PASSED gate must have zero open CRITICAL findings and zero unwaived HIGH findings.",
-          "if": {
-            "properties": { "status": { "const": "PASSED" } }
-          },
-          "then": {
+      "items": {
+        "type": "object",
+        "required": ["rule_id", "rule_version", "severity", "category", "message", "location"],
+        "properties": {
+          "rule_id": { "type": "string", "pattern": "^(SCH|OAS|POL|SEC)-[A-Za-z0-9_-]+$" },
+          "rule_version": { "type": "string" },
+          "severity": { "type": "string", "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"] },
+          "category": { "type": "string", "enum": ["schema", "openapi", "policy", "security"] },
+          "message": { "type": "string" },
+          "location": {
+            "type": "object",
+            "required": ["file", "path"],
             "properties": {
-              "summary": {
-                "properties": {
-                  "CRITICAL": { "const": 0 }
-                }
-              }
+              "file": { "type": "string" },
+              "path": { "type": "string" },
+              "line": { "type": "integer" }
             }
           }
         }
-      ]
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["artifacts", "hash_digest"],
+      "properties": {
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["domain", "target_file", "rule_count"],
+            "properties": {
+              "domain": { "type": "string" },
+              "target_file": { "type": "string" },
+              "rule_count": { "type": "integer" }
+            }
+          }
+        },
+        "hash_digest": { "type": "string" }
+      }
     }
   }
 }
