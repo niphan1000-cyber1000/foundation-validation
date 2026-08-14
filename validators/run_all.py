@@ -14,6 +14,38 @@ from schema_engine import validate as validate_schema
 from openapi_engine import parse_spectral_output
 from policy_engine import parse_opa_output
 
+def normalize_finding(item, default_prefix="SEC"):
+    rule_id = str(item.get("rule_id", "001"))
+    if not rule_id.startswith(("SCH-", "OAS-", "POL-", "SEC-")):
+        # Strip any existing prefix if present but non-standard
+        clean_code = rule_id.split("-")[-1] if "-" in rule_id else rule_id
+        rule_id = f"{default_prefix}-{clean_code}"
+
+    sev = str(item.get("severity", "MEDIUM")).upper()
+    if sev not in ["CRITICAL", "HIGH", "MEDIUM", "LOW"]:
+        sev = "MEDIUM"
+
+    cat = str(item.get("category", "schema")).lower()
+    if cat not in ["schema", "openapi", "policy", "security"]:
+        cat = "schema"
+
+    loc = item.get("location", {})
+    if not isinstance(loc, dict):
+        loc = {"file": "unknown", "path": "root", "line": 0}
+
+    return {
+        "rule_id": rule_id,
+        "rule_version": str(item.get("rule_version", "1.0.0")),
+        "severity": sev,
+        "category": cat,
+        "message": str(item.get("message", "Validation finding detected")),
+        "location": {
+            "file": str(loc.get("file", "unknown")),
+            "path": str(loc.get("path", "root")),
+            "line": int(loc.get("line", 0)) if isinstance(loc.get("line"), int) else 0
+        }
+    }
+
 def run_all_validations(schema_path=None, target_schema_json=None, openapi_json_data=None, opa_json_data=None):
     all_findings = []
     artifacts = []
@@ -23,14 +55,14 @@ def run_all_validations(schema_path=None, target_schema_json=None, openapi_json_
         try:
             schema_errors = validate_schema(target_schema_json, schema_path)
             for err in schema_errors:
-                all_findings.append({
-                    "rule_id": f"SCH-{err.get('rule_id', '001')}",
-                    "rule_version": "1.0.0",
+                f = normalize_finding({
+                    "rule_id": err.get("rule_id", "001"),
                     "severity": err.get("severity", "CRITICAL"),
                     "category": "schema",
-                    "message": err.get("message", "Schema validation error"),
+                    "message": err.get("message", "Schema error"),
                     "location": {"file": "schema_target", "path": err.get("path", "root"), "line": 0}
-                })
+                }, default_prefix="SCH")
+                all_findings.append(f)
             artifacts.append({"domain": "schema", "target_file": "schema_target", "rule_count": len(schema_errors)})
         except Exception:
             pass
@@ -39,16 +71,14 @@ def run_all_validations(schema_path=None, target_schema_json=None, openapi_json_
     if openapi_json_data:
         raw_oas = parse_spectral_output(openapi_json_data, target_path="openapi_target")
         for item in raw_oas:
-            item["rule_version"] = "1.0.0"
-            all_findings.append(item)
+            all_findings.append(normalize_finding(item, default_prefix="OAS"))
         artifacts.append({"domain": "openapi", "target_file": "openapi_target", "rule_count": len(raw_oas)})
 
     # 3. Policy Domain
     if opa_json_data:
         raw_pol = parse_opa_output(opa_json_data, target_path="policy_target")
         for item in raw_pol:
-            item["rule_version"] = "1.0.0"
-            all_findings.append(item)
+            all_findings.append(normalize_finding(item, default_prefix="POL"))
         artifacts.append({"domain": "policy", "target_file": "policy_target", "rule_count": len(raw_pol)})
 
     # Severity Summary Calculation
