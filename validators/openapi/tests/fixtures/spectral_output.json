@@ -1,0 +1,1 @@
+﻿[{"code":"oas3-schema","path":["paths","/users","get"],"message":"GET operation should have responses","severity":0,"range":{"start":{"line":12}}}]

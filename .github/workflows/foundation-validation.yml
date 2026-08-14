@@ -23,6 +23,10 @@ jobs:
         run: |
           python3 -m unittest discover -s validators/schema/tests -p "test_*.py"
 
+      - name: Run OpenAPI Engine Unit Tests
+        run: |
+          python3 -m unittest discover -s validators/openapi/tests -p "test_*.py"
+
       - name: Run Schema Validator CLI
         run: |
           python3 validators/schema/run.py --schema schemas/validation-result.schema.json --target validators/schema/tests/fixtures/valid_result.json
