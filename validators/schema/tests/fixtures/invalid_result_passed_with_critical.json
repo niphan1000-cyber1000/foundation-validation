@@ -1,0 +1,25 @@
+{
+  "id": "val-deadbeef",
+  "status": "PASSED",
+  "target": {
+    "type": "commit",
+    "reference": "github.com/cloudforge/foundation-validation@deadbeef"
+  },
+  "domains": ["security"],
+  "created_at": "2026-08-13T09:15:00Z",
+  "gate_result": {
+    "status": "PASSED",
+    "summary": {"CRITICAL": 1, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "INFO": 0},
+    "findings": [
+      {
+        "finding_id": "fnd-0099",
+        "rule_id": "SEC-001",
+        "domain": "security",
+        "severity": "CRITICAL",
+        "status": "fail",
+        "message": "Hardcoded secret detected",
+        "evidence_ids": ["ev-0099"]
+      }
+    ]
+  }
+}

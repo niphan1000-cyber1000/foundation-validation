@@ -34,10 +34,13 @@ Regardless of domain, a validator MUST:
 
 ## Status
 
-This structure is scaffolding for Phase C. Each domain folder currently
-contains only its `README.md` describing intended scope — no validator
-implementations exist yet. Existing OPA policies in `security/` (the
-top-level, pre-Phase-C `security/policy.rego` and `security-policies.rego`)
-are the Policy-as-code engine that the `policy/` and `security/` validators
-below will eventually wrap and report through the `Finding`/`Evidence`
-contract above.
+| Domain | Status |
+|---|---|
+| `schema/` | **Implemented** — see [`schema/README.md`](./schema/README.md). Stdlib-only JSON Schema engine, `SCH-001`..`SCH-005` rules, CLI + test suite. |
+| `openapi/`, `security/`, `policy/`, `governance/`, `traceability/` | Scaffolding only — `README.md` describes intended scope, no implementation yet. |
+
+Existing OPA policies in the top-level `security/` folder (distinct from
+`validators/security/` — see that folder's README for the naming note)
+are the Policy-as-code engine that the `policy/` and `security/`
+validators will eventually wrap and report through the `Finding`/`Evidence`
+contract above, following the same pattern `schema/` now demonstrates.
