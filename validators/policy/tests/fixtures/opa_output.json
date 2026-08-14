@@ -1,0 +1,14 @@
+﻿{
+  "result": [
+    {
+      "deny": [
+        {
+          "code": "001",
+          "message": "Unauthorized access to restricted resource",
+          "severity": "CRITICAL",
+          "path": "authz.allow"
+        }
+      ]
+    }
+  ]
+}
