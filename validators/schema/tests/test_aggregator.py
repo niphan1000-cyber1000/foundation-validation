@@ -2,8 +2,16 @@
 import os
 import sys
 
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-sys.path.insert(0, BASE_DIR)
+# Dynamically resolve root project path for CI runner
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "..", "..", ".."))
+VALIDATORS_DIR = os.path.abspath(os.path.join(CURRENT_DIR, "..", ".."))
+
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+if VALIDATORS_DIR not in sys.path:
+    sys.path.insert(0, VALIDATORS_DIR)
+
 from run_all import run_all_validations
 
 class TestGovernedAggregatorEngine(unittest.TestCase):
