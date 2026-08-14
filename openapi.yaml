@@ -275,7 +275,7 @@ components:
           $ref: '#/components/schemas/Target'
         domains:
           type: array
-          description: Validation domains to execute, or ["all"] to run every domain
+          description: Validation domains to execute. To run every domain, list all six values explicitly.
           items:
             $ref: '#/components/schemas/Domain'
           minItems: 1
