@@ -24,10 +24,42 @@
 #   owner                 - team or person responsible for this rule
 #   introduced_version     - registry version this rule first appeared in
 #   deprecated_version      - registry version this rule was deprecated in (if any)
+#
+# Note: this registry currently documents custom rules defined directly
+# in .spectral.yaml. That file also extends the built-in "spectral:oas"
+# ruleset (e.g. oas3-schema), which contributes additional findings not
+# yet catalogued here. Those built-in rules should be documented
+# separately once the team decides how much of Spectral's default
+# ruleset to treat as governed vs. informational.
 
-version: "1.0.0"
+version: "1.1.0"
 
 rules:
+  - rule_id: OAS-001-path-kebab-case
+    domain: openapi
+    version: "1.0.0"
+    severity: HIGH
+    title: "API paths must use kebab-case"
+    description: >
+      Every path segment in the OpenAPI "paths" object must use
+      kebab-case (e.g. "/user-profiles"), not camelCase or snake_case
+      (e.g. not "/userProfiles"). Enforced via Spectral pattern match
+      against each path key.
+    purpose: >
+      Consistent path casing keeps the API surface predictable for
+      consumers and avoids mixed-convention endpoints accumulating
+      over time as different teams add routes.
+    requirement_id: null
+    implementation: ".spectral.yaml (custom rule) via validators/openapi/ -> validators/run_all.py --spec"
+    evidence_type: "spec-lint-finding"
+    gate_behavior: FAIL
+    references:
+      - "https://spec.openapis.org/oas/v3.0.3#paths-object"
+    status: active
+    owner: unassigned
+    introduced_version: "1.1.0"
+    deprecated_version: null
+
   - rule_id: OAS-002-error-responses
     domain: openapi
     version: "1.0.0"
@@ -38,13 +70,15 @@ rules:
       4XX and 5XX status ranges, using the uppercase wildcard keys
       "4XX" and "5XX" as defined by the OpenAPI 3.0 specification.
       Lowercase keys ("4xx", "5xx") or missing error ranges cause this
-      rule to fail.
+      rule to fail. Note: .spectral.yaml currently defines this rule's
+      severity as "warn"; the registry records HIGH as the intended
+      governance severity pending alignment between the two.
     purpose: >
       Ensures API consumers can rely on a documented, consistent error
       contract instead of guessing failure behavior. Missing error
       responses are a common source of undocumented client-side bugs.
     requirement_id: null
-    implementation: "validators/openapi/ (Spectral wrapper) via validators/run_all.py --spec"
+    implementation: ".spectral.yaml (custom rule) via validators/openapi/ -> validators/run_all.py --spec"
     evidence_type: "spec-lint-finding"
     gate_behavior: FAIL
     references:
@@ -52,4 +86,28 @@ rules:
     status: active
     owner: unassigned
     introduced_version: "1.0.0"
+    deprecated_version: null
+
+  - rule_id: SEC-001-https-only
+    domain: security
+    version: "1.0.0"
+    severity: CRITICAL
+    title: "Server URLs must use HTTPS only"
+    description: >
+      Every entry in the OpenAPI "servers" array must have a "url"
+      starting with "https://". Plain HTTP server URLs are rejected.
+    purpose: >
+      Prevents API traffic (including credentials and tokens sent by
+      clients) from being transmitted over unencrypted HTTP, and stops
+      an insecure server URL from being published as part of the
+      contract that client tooling generates code against.
+    requirement_id: null
+    implementation: ".spectral.yaml (custom rule) via validators/openapi/ -> validators/run_all.py --spec"
+    evidence_type: "spec-lint-finding"
+    gate_behavior: FAIL
+    references:
+      - "https://spec.openapis.org/oas/v3.0.3#server-object"
+    status: active
+    owner: unassigned
+    introduced_version: "1.1.0"
     deprecated_version: null
