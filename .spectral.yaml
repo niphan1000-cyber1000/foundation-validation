@@ -1,35 +1,30 @@
-extends:
-  - "spectral:oas"
+﻿extends: ["spectral:oas"]
 
 rules:
-  operation-operationId:
-    description: Every operation must have an operationId
-    given: "$.paths.*[?( @property === 'get' || @property === 'put' || @property === 'post' || @property === 'delete' || @property === 'patch' )]"
-    then:
-      field: operationId
-      function: truthy
+  OAS-001-path-kebab-case:
+    description: "API paths must use kebab-case (e.g., /user-profiles, not /userProfiles)"
     severity: error
-
-  operation-tags:
-    description: Every operation must have at least one tag
-    given: "$.paths.*[?( @property === 'get' || @property === 'put' || @property === 'post' || @property === 'delete' || @property === 'patch' )]"
+    given: $.paths[*]~
     then:
-      field: tags
-      function: truthy
+      function: pattern
+      functionOptions:
+        match: "^/([a-z0-9-]+|\\{[a-zA-Z0-9_]+\\})(Path|/[a-z0-9-]+|/\\{[a-zA-Z0-9_]+\\})*$"
+
+  OAS-002-error-responses:
+    description: "Operations should define standard 4xx and 5xx error responses"
     severity: error
-
-  must-have-x-api-id:
-    description: Every operation must have x-api-id extension
-    given: "$.paths.*[?( @property === 'get' || @property === 'put' || @property === 'post' || @property === 'delete' || @property === 'patch' )]"
+    given: $.paths..[get,post,put,delete,patch].responses
     then:
-      field: x-api-id
-      function: truthy
+      field: "@key"
+      function: pattern
+      functionOptions:
+        match: "^(4|5)"
+
+  SEC-001-https-only:
+    description: "Server URLs must use HTTPS only"
     severity: error
-
-  must-have-x-traceability:
-    description: Every operation should have x-traceability
-    given: "$.paths.*[?( @property === 'get' || @property === 'put' || @property === 'post' || @property === 'delete' || @property === 'patch' )]"
+    given: $.servers[*].url
     then:
-      field: x-traceability
-      function: truthy
-    severity: warn
+      function: pattern
+      functionOptions:
+        match: "^https://"
