@@ -117,15 +117,41 @@ def run_all_validations(schema_path=None, target_schema_json=None, openapi_json_
 
 def main():
     parser = argparse.ArgumentParser(description="Governed Validation Master Gate CLI")
+    parser.add_argument("--spec", default=None, help="Path to OpenAPI spec JSON file")
+    parser.add_argument("--sarif", default=None, help="Path to write SARIF output")
     parser.add_argument("--output", default="validation-result.json", help="Output result JSON file path")
     args = parser.parse_args()
 
-    result = run_all_validations()
+    openapi_data = None
+    if args.spec:
+        with open(args.spec, 'r', encoding='utf-8-sig') as f:
+            openapi_data = json.load(f)
+
+    result = run_all_validations(openapi_json_data=openapi_data)
 
     with open(args.output, 'w', encoding='utf-8') as f:
         json.dump(result, f, indent=2)
 
     print(json.dumps(result, indent=2))
+
+    if args.sarif:
+        sarif = {
+            'version': '2.1.0',
+            'runs': [{
+                'tool': {'driver': {'name': 'GovernedValidation', 'rules': []}},
+                'results': [
+                    {
+                        'ruleId': f.get('rule_id', 'unknown'),
+                        'level': 'error' if f.get('severity') in ('CRITICAL', 'HIGH') else 'warning',
+                        'message': {'text': f.get('message', '')},
+                        'locations': [{'physicalLocation': {'artifactLocation': {'uri': f.get('location', {}).get('file', 'unknown')}}}]
+                    } for f in result.get('findings', [])
+                ]
+            }]
+        }
+        with open(args.sarif, 'w', encoding='utf-8') as f:
+            json.dump(sarif, f, indent=2)
+        print(f'SARIF written to {args.sarif}')
 
 if __name__ == "__main__":
     main()

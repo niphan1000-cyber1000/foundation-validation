@@ -1,0 +1,169 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Payment Gateway Service API",
+    "version": "1.0.0",
+    "description": "Enterprise Governed Payment Processing Service.",
+    "contact": {
+      "name": "API Governance Team",
+      "email": "api-support@company.com",
+      "url": "https://developer.company.com"
+    },
+    "x-governance-id": "GOV-PAY-2026-001",
+    "x-owner": "Payments-Team",
+    "x-domain": "Finance"
+  },
+  "tags": [
+    {
+      "name": "Payments",
+      "description": "Operations related to payment processing"
+    }
+  ],
+  "servers": [
+    {
+      "url": "https://api.payments.company.com/v1",
+      "description": "Production Gateway Server"
+    }
+  ],
+  "security": [
+    {
+      "OAuth2": [
+        "payments:write"
+      ]
+    }
+  ],
+  "paths": {
+    "/payments/charge": {
+      "post": {
+        "summary": "Process Credit Card Charge",
+        "description": "Initiates a secure charge operation against the target payment method.",
+        "operationId": "chargePayment",
+        "tags": [
+          "Payments"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChargeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChargeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Client Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "OAuth2": {
+        "type": "oauth2",
+        "flows": {
+          "clientCredentials": {
+            "tokenUrl": "https://auth.company.com/oauth/token",
+            "scopes": {
+              "payments:write": "Grants write permission for charge operations"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "ChargeRequest": {
+        "type": "object",
+        "required": [
+          "amount",
+          "currency"
+        ],
+        "properties": {
+          "amount": {
+            "type": "number",
+            "example": 100.0
+          },
+          "currency": {
+            "type": "string",
+            "example": "THB"
+          }
+        }
+      },
+      "ChargeResponse": {
+        "type": "object",
+        "properties": {
+          "transactionId": {
+            "type": "string",
+            "example": "TXN-998877"
+          },
+          "status": {
+            "type": "string",
+            "example": "SUCCESS"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "INVALID_INPUT"
+          },
+          "message": {
+            "type": "string",
+            "example": "Amount must be greater than 0"
+          }
+        }
+      }
+    }
+  }
+}

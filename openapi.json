@@ -1,0 +1,50 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Bad Spec Test",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://api.example.com/v1" }
+  ],
+  "paths": {
+    "/user_profiles": {
+      "get": {
+        "summary": "Get user profiles",
+        "parameters": [
+          {
+            "name": "X-API-KEY",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfile"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "UserProfile": {
+        "type": "object",
+        "properties": {
+          "user_id": { "type": "string" },
+          "first_name": { "type": "string" }
+        }
+      }
+    }
+  }
+}
