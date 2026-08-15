@@ -1,0 +1,52 @@
+name: API Governance Gate
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  validate-api-spec:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install OPA (Open Policy Agent)
+        run: |
+          curl -L -o opa https://openpolicyagent.org/downloads/v0.62.0/opa_linux_amd64_static
+          chmod +x opa
+          sudo mv opa /usr/local/bin/
+
+      - name: Install Spectral CLI
+        run: npm install -g @stoplight/spectral-cli
+
+      - name: Run Master Governance Gate Validation
+        continue-on-error: true
+        run: |
+          PYTHONPATH=. python validators/run_all.py --spec openapi.json --sarif results.sarif
+
+      - name: Upload SARIF report to GitHub Security Tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
+
+      - name: Upload Validation Result Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-result
+          path: validation-result.json
