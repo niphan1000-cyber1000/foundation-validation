@@ -31,8 +31,12 @@
 # yet catalogued here. Those built-in rules should be documented
 # separately once the team decides how much of Spectral's default
 # ruleset to treat as governed vs. informational.
+#
+# Severity alignment: as of registry version 1.2.0, every custom rule's
+# "severity" field below matches the "severity" set in .spectral.yaml.
+# Keep both files in sync when changing either one.
 
-version: "1.1.0"
+version: "1.2.0"
 
 rules:
   - rule_id: OAS-001-path-kebab-case
@@ -62,7 +66,7 @@ rules:
 
   - rule_id: OAS-002-error-responses
     domain: openapi
-    version: "1.0.0"
+    version: "1.1.0"
     severity: HIGH
     title: "Operations must define standard 4XX and 5XX error responses"
     description: >
@@ -70,9 +74,7 @@ rules:
       4XX and 5XX status ranges, using the uppercase wildcard keys
       "4XX" and "5XX" as defined by the OpenAPI 3.0 specification.
       Lowercase keys ("4xx", "5xx") or missing error ranges cause this
-      rule to fail. Note: .spectral.yaml currently defines this rule's
-      severity as "warn"; the registry records HIGH as the intended
-      governance severity pending alignment between the two.
+      rule to fail.
     purpose: >
       Ensures API consumers can rely on a documented, consistent error
       contract instead of guessing failure behavior. Missing error
