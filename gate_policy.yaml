@@ -1,0 +1,14 @@
+version: "1.0"
+rules:
+  spectral:
+    on_fail: "BLOCK"
+    on_error: "BLOCK"
+  opa:
+    on_fail: "BLOCK"
+    on_error: "BLOCK"
+  trivy:
+    on_fail: "WARN"
+    on_error: "BLOCK"
+  default:
+    on_fail: "BLOCK"
+    on_error: "BLOCK"
