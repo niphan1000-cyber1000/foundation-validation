@@ -126,6 +126,38 @@ def _resolve_executable(name):
     return shutil.which(name)
 
 
+def _parse_leading_json(text, tool_name):
+    """Parse the first well-formed JSON value at the start of `text` and
+    ignore anything after it.
+
+    Some CLI wrappers (notably `npx` on Windows, and sometimes OPA)
+    print a valid JSON payload to stdout immediately followed by an
+    unrelated notice/warning line with no separating newline — a plain
+    json.loads() then fails with "Extra data" even though the tool's
+    actual output was perfectly valid. json.JSONDecoder.raw_decode()
+    parses only the leading value and reports where it ended, which is
+    exactly what we need here; trailing bytes are logged, not treated as
+    a parse failure.
+    """
+    decoder = json.JSONDecoder()
+    try:
+        value, end = decoder.raw_decode(text)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(
+            f"{tool_name} returned non-JSON output: {e}. "
+            f"First 300 chars of stdout: {text[:300]!r}"
+        ) from e
+
+    trailing = text[end:].strip()
+    if trailing:
+        print(
+            f"WARNING: {tool_name} printed {len(trailing)} extra characters "
+            f"after its JSON output (ignored): {trailing[:200]!r}",
+            file=sys.stderr,
+        )
+    return value
+
+
 def _invoke_spectral(spec_path):
     """Run Spectral CLI against spec_path and return its raw JSON findings
     list. Raises RuntimeError (system error, not a silent []) if Spectral
@@ -153,10 +185,7 @@ def _invoke_spectral(spec_path):
         raise RuntimeError(
             f"Spectral CLI produced no output (exit {proc.returncode}): {stderr[:500]}"
         )
-    try:
-        return json.loads(stdout)
-    except json.JSONDecodeError as e:
-        raise RuntimeError(f"Spectral CLI returned non-JSON output: {e}") from e
+    return _parse_leading_json(stdout, tool_name="Spectral CLI")
 
 
 def _invoke_opa(spec_path, policy_dir="policies"):
@@ -186,10 +215,7 @@ def _invoke_opa(spec_path, policy_dir="policies"):
         raise RuntimeError(
             f"OPA CLI produced no output (exit {proc.returncode}): {stderr[:500]}"
         )
-    try:
-        return json.loads(stdout)
-    except json.JSONDecodeError as e:
-        raise RuntimeError(f"OPA CLI returned non-JSON output: {e}") from e
+    return _parse_leading_json(stdout, tool_name="OPA CLI")
 
 
 def run_all_validations(

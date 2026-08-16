@@ -13,12 +13,23 @@ rules:
   OAS-002-error-responses:
     description: "Operations should define standard 4xx and 5xx error responses"
     severity: error
+    # The previous version of this rule used `field: "@key"` + `pattern`,
+    # which checks that EVERY response key matches ^(4|5) — that always
+    # flagged the required "200" success response too, so no valid spec
+    # could ever pass. This version instead asserts "at least one
+    # response key matches ^[45]" via the standard JSON Schema
+    # not(propertyNames(not(pattern))) idiom, which is the correct way
+    # to express an existential (rather than universal) key check.
     given: $.paths..[get,post,put,delete,patch].responses
     then:
-      field: "@key"
-      function: pattern
+      function: schema
       functionOptions:
-        match: "^(4|5)"
+        schema:
+          type: object
+          not:
+            propertyNames:
+              not:
+                pattern: "^[45]"
 
   SEC-001-https-only:
     description: "Server URLs must use HTTPS only"
