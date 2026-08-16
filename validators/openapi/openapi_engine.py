@@ -19,6 +19,8 @@ def parse_spectral_output(spectral_json_data, target_path=""):
     if not isinstance(results, list):
         return findings
 
+    _KNOWN_PREFIXES = ("SCH-", "OAS-", "POL-", "SEC-", "GOV-", "TRC-")
+
     for item in results:
         severity_code = item.get("severity", 1)
         # Spectral severity: 0=Error, 1=Warning, 2=Info, 3=Hint
@@ -28,8 +30,18 @@ def parse_spectral_output(spectral_json_data, target_path=""):
         path_list = item.get("path", [])
         path_str = ".".join(str(p) for p in path_list) if path_list else "root"
 
+        code = item.get("code", "GENERIC")
+        # Custom rules (defined in .spectral.yaml, catalogued in
+        # rules/registry.yaml) are already named like "OAS-002-...".
+        # Built-in Spectral rules (e.g. "oas3-schema") are not, and need
+        # the "OAS-" prefix added so every openapi-domain rule_id is
+        # consistently namespaced. Prepending unconditionally used to
+        # double the prefix on custom rules ("OAS-OAS-002-..."), which
+        # made them invisible to the registry lookup in run_all.py.
+        rule_id = code if code.startswith(_KNOWN_PREFIXES) else f"OAS-{code}"
+
         finding = {
-            "rule_id": f"OAS-{item.get('code', 'GENERIC')}",
+            "rule_id": rule_id,
             "severity": severity,
             "category": "openapi",
             "message": item.get("message", "Spectral validation error"),

@@ -12,7 +12,9 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def load(path: Path) -> dict:
-    return json.loads(path.read_text(encoding="utf-8"))
+    # utf-8-sig strips a BOM if present (schemas/*.json in this repo are
+    # saved with one) and behaves identically to utf-8 when there is none.
+    return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
 class TestValidationRequestSchema(unittest.TestCase):
@@ -54,16 +56,47 @@ class TestValidationResultSchema(unittest.TestCase):
         instance = load(FIXTURES / "invalid_result_passed_with_critical.json")
         errors = validate(instance, self.schema)
         self.assertTrue(
-            any(e.path.endswith("CRITICAL") for e in errors),
-            f"expected a CRITICAL-count violation, got: {errors}",
+            any(e.path.endswith("critical") for e in errors),
+            f"expected a critical-count violation, got: {errors}",
         )
 
-    def test_null_gate_result_allowed_for_in_progress_run(self):
+    def test_null_result_fields_allowed_for_in_progress_run(self):
         instance = load(FIXTURES / "valid_result.json")
         instance["status"] = "RUNNING"
-        instance["gate_result"] = None
+        instance["summary"] = None
+        instance["findings"] = None
+        instance["evidence"] = None
         errors = validate(instance, self.schema)
-        self.assertEqual(errors, [], f"gate_result should be nullable while RUNNING, got: {errors}")
+        self.assertEqual(
+            errors, [],
+            f"summary/findings/evidence should be nullable while RUNNING, got: {errors}",
+        )
+
+    def test_running_status_still_requires_execution(self):
+        instance = load(FIXTURES / "valid_result.json")
+        instance["status"] = "RUNNING"
+        instance["summary"] = None
+        instance["findings"] = None
+        instance["evidence"] = None
+        del instance["execution"]
+        errors = validate(instance, self.schema)
+        self.assertTrue(
+            any(e.path == "$.execution" and e.keyword == "required" for e in errors),
+            f"execution should still be required even while RUNNING, got: {errors}",
+        )
+
+    def test_terminal_status_rejects_null_result_fields(self):
+        """Only RUNNING may have null summary/findings/evidence — a
+        PASSED/FAILED/ERROR result must always carry a real result."""
+        instance = load(FIXTURES / "valid_result.json")
+        instance["summary"] = None
+        instance["findings"] = None
+        instance["evidence"] = None
+        errors = validate(instance, self.schema)
+        self.assertTrue(
+            any(e.keyword == "type" and e.path in ("$.summary", "$.findings", "$.evidence") for e in errors),
+            f"expected PASSED with null result fields to fail 'type', got: {errors}",
+        )
 
 
 class TestValidationEvidenceSchema(unittest.TestCase):

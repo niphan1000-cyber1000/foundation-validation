@@ -1,8 +1,8 @@
-﻿{
-  "\": "https://json-schema.org/draft/2020-12/schema",
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ValidationResultContract",
   "type": "object",
-  "required": ["execution", "status", "summary", "findings", "evidence"],
+  "required": ["execution", "status"],
   "properties": {
     "execution": {
       "type": "object",
@@ -16,10 +16,10 @@
     },
     "status": {
       "type": "string",
-      "enum": ["PASSED", "FAILED", "ERROR"]
+      "enum": ["PASSED", "FAILED", "ERROR", "RUNNING"]
     },
     "summary": {
-      "type": "object",
+      "type": ["object", "null"],
       "required": ["total_findings", "critical", "high", "medium", "low"],
       "properties": {
         "total_findings": { "type": "integer", "minimum": 0 },
@@ -30,7 +30,7 @@
       }
     },
     "findings": {
-      "type": "array",
+      "type": ["array", "null"],
       "items": {
         "type": "object",
         "required": ["rule_id", "rule_version", "severity", "category", "message", "location"],
@@ -53,7 +53,7 @@
       }
     },
     "evidence": {
-      "type": "object",
+      "type": ["object", "null"],
       "required": ["artifacts", "hash_digest"],
       "properties": {
         "artifacts": {
@@ -71,5 +71,38 @@
         "hash_digest": { "type": "string" }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "description": "Exit Criteria #1 (spec Section 7): a PASSED gate must have zero open CRITICAL findings.",
+      "if": {
+        "required": ["status"],
+        "properties": { "status": { "const": "PASSED" } }
+      },
+      "then": {
+        "required": ["summary"],
+        "properties": {
+          "summary": {
+            "required": ["critical"],
+            "properties": { "critical": { "const": 0 } }
+          }
+        }
+      }
+    },
+    {
+      "description": "summary/findings/evidence are only allowed to be null while a run is still RUNNING; every terminal status (PASSED/FAILED/ERROR) must carry a real result.",
+      "if": {
+        "required": ["status"],
+        "properties": { "status": { "const": "RUNNING" } }
+      },
+      "else": {
+        "required": ["summary", "findings", "evidence"],
+        "properties": {
+          "summary": { "type": "object" },
+          "findings": { "type": "array" },
+          "evidence": { "type": "object" }
+        }
+      }
+    }
+  ]
 }

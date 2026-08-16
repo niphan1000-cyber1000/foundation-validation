@@ -1,29 +1,26 @@
 {
-  "id": "val-8f3c1a20",
+  "execution": {
+    "execution_id": "val-8f3c1a20",
+    "timestamp": "2026-08-13T09:15:00Z",
+    "platform_version": "1.0.0",
+    "environment": "production"
+  },
   "status": "PASSED",
-  "target": {
-    "type": "repository",
-    "reference": "github.com/cloudforge/foundation-validation@a1b2c3d"
-  },
-  "domains": ["schema", "openapi"],
-  "ruleset_version": "0.1.0",
-  "requested_by": "ci:github-actions",
-  "context": {"commit_sha": "a1b2c3d"},
-  "gate_result": {
-    "status": "PASSED",
-    "summary": {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 2, "LOW": 5, "INFO": 1},
-    "findings": [
-      {
-        "finding_id": "fnd-0007",
-        "rule_id": "SEC-003",
-        "domain": "security",
-        "severity": "MEDIUM",
-        "status": "fail",
-        "message": "Example non-blocking finding",
-        "evidence_ids": ["ev-0012"]
-      }
-    ]
-  },
-  "created_at": "2026-08-13T09:15:00Z",
-  "updated_at": "2026-08-13T09:16:42Z"
+  "summary": { "total_findings": 1, "critical": 0, "high": 0, "medium": 1, "low": 0 },
+  "findings": [
+    {
+      "rule_id": "SEC-003",
+      "rule_version": "1.0.0",
+      "severity": "MEDIUM",
+      "category": "security",
+      "message": "Example non-blocking finding",
+      "location": { "file": "openapi.json", "path": "$.paths", "line": 12 }
+    }
+  ],
+  "evidence": {
+    "artifacts": [
+      { "domain": "security", "target_file": "openapi.json", "rule_count": 1 }
+    ],
+    "hash_digest": "3f786850e387550fdab836ed7e6dc881de23001b"
+  }
 }

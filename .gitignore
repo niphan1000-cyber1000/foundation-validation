@@ -1,2 +1,4 @@
 ﻿__pycache__/
 *.pyc
+validation-result.json
+results.sarif
