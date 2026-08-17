@@ -23,7 +23,7 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Run Prove FAIL Injection Test
+      - name: Run Prove ERROR Test (Fail-closed Verification)
         run: |
-          # บังคับทดสอบด้วยไฟล openapi-bad.yaml เพื่อพิสจนว่าเกตต้องบลอกและสั่ง Exit Non-Zero
-          python run_all.py --spec openapi-bad.yaml || python run_all.py --test-failure-injection
+          # จำลองสถานการระบบขัดข้อง เช่น ส่งค่า argument ที่ทำให้เกิด exception หรือจำลองเครื่องมือล่ม
+          python run_all.py --test-system-error || python run_all.py --simulate-error
