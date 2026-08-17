@@ -1,6 +1,36 @@
-﻿version: "1.0"
-gate_rules:
-  block_on:
-    - error
-    - warning
-  allow_override: false
+# Gate policy consumed by src/core/engine.py (GateDecisionEngine).
+#
+# Schema: rules.<validator_name>.{on_fail, on_error} — the action to take
+# when that specific validator reports FAIL / ERROR. "default" applies to
+# any validator not explicitly listed. ERROR always forces BLOCK
+# regardless of on_error (fail-safe invariant enforced in code, not
+# overridable here) — on_error is kept for documentation/clarity only.
+#
+# NOTE: an earlier version of this file used a different schema
+# (gate_rules.block_on: [...]) written against a since-deleted stub
+# (root run_all.py's evaluate_gate_decision). That schema was never
+# compatible with GateDecisionEngine, which silently fell through to a
+# broken default and produced BLOCK for everything. See
+# tests/test_engine.py::test_engine_with_yaml_policy for the regression
+# test that caught this.
+version: "1.1"
+rules:
+  spectral:
+    on_fail: BLOCK
+    on_error: BLOCK
+  opa:
+    on_fail: BLOCK
+    on_error: BLOCK
+  policy:
+    on_fail: BLOCK
+    on_error: BLOCK
+  # Example third-party validator (e.g. a container/dependency scanner)
+  # configured to warn rather than block — demonstrates that not every
+  # validator needs the same strictness.
+  trivy:
+    on_fail: WARN
+    on_error: BLOCK
+  default:
+    on_fail: BLOCK
+    on_error: BLOCK
+allow_override: false

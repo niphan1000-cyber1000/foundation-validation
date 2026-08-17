@@ -9,13 +9,16 @@ class GateDecisionEngine:
         actions: List[GateAction] = []
         reasons: List[str] = []
 
+        fail_safe_default = {"on_fail": "BLOCK", "on_error": "BLOCK"}
+        rules = self.policy.get("rules", {}) if isinstance(self.policy, dict) else {}
+
         for res in results:
-            validator_policy = self.policy.get("rules", {}).get(
-                res.validator_name, 
-                self.policy.get("rules", {"default": {"on_fail": "BLOCK", "on_error": "BLOCK"}})
+            validator_policy = rules.get(
+                res.validator_name,
+                rules.get("default", fail_safe_default),
             )
             if not isinstance(validator_policy, dict):
-                validator_policy = {"on_fail": "BLOCK", "on_error": "BLOCK"}
+                validator_policy = fail_safe_default
 
             if res.state == ValidationState.ERROR:
                 actions.append(GateAction.BLOCK)

@@ -14,7 +14,7 @@ echo "Installing pre-commit hook..."
 cat << 'EOF' > "$PRE_COMMIT_HOOK"
 #!/bin/sh
 echo "Running Governed Validation Gate pre-commit check..."
-python src/run_all.py
+python validators/run_all.py --spec openapi.json --output validation-result.json
 if [ $? -ne 0 ]; then
     echo "❌ Validation failed! Commit aborted. Please fix the issues before committing."
     exit 1
