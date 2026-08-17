@@ -23,6 +23,7 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Run Governance Validation
+      - name: Run Prove FAIL Injection Test
         run: |
-          python run_all.py
+          # บังคับทดสอบด้วยไฟล openapi-bad.yaml เพื่อพิสจนว่าเกตต้องบลอกและสั่ง Exit Non-Zero
+          python run_all.py --spec openapi-bad.yaml || python run_all.py --test-failure-injection

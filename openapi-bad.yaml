@@ -1,0 +1,5 @@
+﻿openapi: 3.0.0
+info:
+  title: Broken API for Failure Injection
+  version: '1.0.0'
+# จงใจไม่ใส่ paths และข้อมลบังคับ เพื่อให้เกตตรวจจับ Violation ได้แน่ๆ
