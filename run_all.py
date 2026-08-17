@@ -3,9 +3,8 @@ import os
 import json
 
 def main():
-    print("=== API Governance Gate (Strict Fail-Closed Mode) ===")
+    print("=== API Governance Gate (Failure Injection Mode) ===")
     
-    # ตรวจสอบว่ามีการระบุไฟลสเปกเข้ามาหรือไม่ หรือไฟลมีอย่จริงไหม
     spec_file = "openapi.json"
     for i, arg in enumerate(sys.argv):
         if arg == "--spec" and i + 1 < len(sys.argv):
@@ -13,19 +12,33 @@ def main():
 
     try:
         if not os.path.exists(spec_file):
-            print(f"[ERROR] Specification file not found: {spec_file}")
-            # บังคับ Fail-closed ทันทีเมื่อหาไฟลไม่เจอ ห้ามปล่อยผ่านเดดขาด
+            print(f"[FATAL ERROR] Target specification file not found: {spec_file}")
             sys.exit(1)
             
-        print(f"[INFO] Processing specification: {spec_file}")
-        # จำลองการตรวจสอบ (หากมีข้อผิดพลาดจะตกลงมาที่ except)
-        
-        print("[SUCCESS] Validation passed.")
+        with open(spec_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            
+        # ตรวจสอบเบื้องต้น: ถ้าไม่มี openapi field หรือ paths ผิดประเภท ให้ตีตกทันที
+        if "openapi" not in data or not isinstance(data.get("paths"), (dict, type(None))):
+            print(f"[GATE BLOCK] Invalid OpenAPI schema detected in {spec_file}")
+            sys.exit(1)
+            
+        # ตรวจสอบ Policy บังคับ (เช่น ต้องมี paths และ security/responses ตามก)
+        if "paths" in data and isinstance(data["paths"], dict):
+            for path, methods in data["paths"].items():
+                for method, details in methods.items():
+                    if isinstance(details, dict) and "responses" not in details:
+                        print(f"[GATE BLOCK] Policy Violation: Missing responses in {path} [{method}]")
+                        sys.exit(1)
+
+        print(f"[SUCCESS] Specification {spec_file} passed all governance checks.")
         sys.exit(0)
 
+    except json.JSONDecodeError:
+        print(f"[FATAL ERROR] JSON parsing failed for {spec_file} (Malformed file)")
+        sys.exit(1)
     except Exception as e:
-        print(f"[FATAL ERROR] Critical exception encountered: {e}")
-        # ทุกเคสที่เกิด Error ต้องสั่ง Exit 1 เพื่อให้ GitHub Job แดงเสมอ
+        print(f"[FATAL ERROR] Unexpected exception: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
