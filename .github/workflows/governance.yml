@@ -1,4 +1,4 @@
-name: API Governance Gate
+﻿name: API Governance Gate
 
 on:
   pull_request:
@@ -37,18 +37,11 @@ jobs:
 
       - name: Run unit tests (pure gate-decision logic + aggregator contract)
         run: |
-          pytest tests/ validators/tests/ -v
+          python -m pytest tests/ validators/tests/ -v
 
-      # --- Positive control -------------------------------------------------
-      # The spec under governance in this repo (openapi.json) must actually
-      # pass the real engine. If this step fails, the gate is correctly
-      # blocking the PR/push - that IS the hard gate, no "|| echo" escape
-      # hatch. A non-zero exit here fails the job.
       - name: Run Governance Gate against openapi.json
         run: |
-          python validators/run_all.py --spec openapi.json \
-            --sarif results.sarif \
-            --output validation-result.json
+          python validators/run_all.py --spec openapi.json --sarif results.sarif --output validation-result.json
 
       - name: Upload SARIF
         if: always()
@@ -56,17 +49,10 @@ jobs:
         with:
           sarif_file: results.sarif
 
-      # --- Negative control ---------------------------------------------
-      # Proves the gate is actually capable of blocking: feed it a spec we
-      # KNOW violates SEC-001-https-only / OAS-002-error-responses and
-      # assert the engine reports FAILED with a non-zero exit code. If the
-      # engine instead exits 0 on a known-bad spec, that is itself a CI
-      # failure - the gate would be a no-op.
       - name: Verify gate blocks a known-bad spec (negative control)
         run: |
           set +e
-          python validators/run_all.py --spec openapi-bad-example.json \
-            --output /tmp/negative-control-result.json
+          python validators/run_all.py --spec openapi-bad-example.json --output /tmp/negative-control-result.json
           STATUS=$?
           set -e
           if [ "$STATUS" -eq 0 ]; then
