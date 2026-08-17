@@ -1,0 +1,9 @@
+﻿extends: ["spectral:oas", "spectral:recommended"]
+rules:
+  api-must-have-version:
+    description: "API paths must include version prefix (e.g. /v1/...)"
+    given: $.paths
+    severity: error
+    then:
+      field: "^/v1/"
+      function: truthy
