@@ -343,6 +343,30 @@ def run_all_validations(
     return result
 
 
+def _rule_to_sarif_descriptor(rule):
+    """Convert one rules/registry.yaml entry into a SARIF 2.1.0
+    reportingDescriptor. The registry's own fields (rule_id, domain,
+    purpose, owner, gate_behavior, ...) are not valid top-level SARIF
+    properties - GitHub's strict schema validator rejects any additional
+    property it doesn't recognize. Only id/name/shortDescription/
+    fullDescription/help/properties are valid here; everything else the
+    registry tracks goes under "properties", which SARIF reserves
+    specifically for tool-defined metadata."""
+    rule_id = rule.get("rule_id") or rule.get("id") or "UNKNOWN"
+    descriptor = {
+        "id": rule_id,
+        "name": rule.get("title", rule_id),
+        "shortDescription": {"text": rule.get("title", rule_id)},
+        "fullDescription": {"text": rule.get("description", "")},
+        "help": {"text": rule.get("purpose", rule.get("description", ""))},
+        "properties": {
+            k: v for k, v in rule.items()
+            if k not in ("rule_id", "id", "title", "description", "purpose")
+        },
+    }
+    return descriptor
+
+
 def _write_sarif(result, sarif_path, registry):
     findings = result["findings"]
     sarif_output = {
@@ -353,7 +377,7 @@ def _write_sarif(result, sarif_path, registry):
                 "tool": {
                     "driver": {
                         "name": "Foundation Validation Engine",
-                        "rules": list(registry.values()),
+                        "rules": [_rule_to_sarif_descriptor(r) for r in registry.values()],
                     }
                 },
                 "results": [
