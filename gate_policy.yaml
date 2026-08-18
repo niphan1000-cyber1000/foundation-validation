@@ -1,0 +1,6 @@
+﻿version: "1.0"
+gate_rules:
+  block_on:
+    - error
+    - warning
+  allow_override: false

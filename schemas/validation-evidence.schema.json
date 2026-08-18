@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://foundation-validation.cloudforge.internal/schemas/validation-evidence.schema.json",
+  "title": "Evidence",
+  "description": "Immutable evidence record supporting a finding. Mirrors the Evidence component in openapi.yaml (GET /v1/validations/{id}/evidence). Records are append-only: a correction is issued as a new record referencing 'supersedes', never an edit in place, per the Foundation Validation Spec Evidence Model (Section 5.2).",
+  "type": "object",
+  "required": [
+    "evidence_id",
+    "finding_id",
+    "type",
+    "content_ref",
+    "captured_at",
+    "integrity_hash"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "evidence_id": {
+      "type": "string",
+      "minLength": 1,
+      "examples": ["ev-0012"]
+    },
+    "finding_id": {
+      "type": "string",
+      "minLength": 1,
+      "examples": ["fnd-0007"]
+    },
+    "type": { "$ref": "#/$defs/EvidenceType" },
+    "content_ref": {
+      "type": "string",
+      "format": "uri-reference",
+      "description": "URI or content-addressable reference to the evidence payload. Raw content is never inlined in the record.",
+      "examples": [
+        "s3://foundation-validation-evidence/val-8f3c1a20/ev-0012.log"
+      ]
+    },
+    "captured_at": {
+      "type": "string",
+      "format": "date-time",
+      "examples": ["2026-08-13T09:16:10Z"]
+    },
+    "integrity_hash": {
+      "type": "string",
+      "description": "SHA-256 hash of the evidence content, used to detect tampering after capture.",
+      "pattern": "^[a-f0-9]{64}$",
+      "examples": [
+        "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+      ]
+    },
+    "producer": {
+      "type": "object",
+      "description": "Validator or tool that generated this evidence.",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "examples": ["trivy-fs"] },
+        "version": { "type": "string", "examples": ["0.53.0"] }
+      }
+    },
+    "supersedes": {
+      "description": "Evidence ID this record replaces, if any.",
+      "oneOf": [
+        { "type": "string", "minLength": 1 },
+        { "type": "null" }
+      ]
+    }
+  },
+  "$defs": {
+    "EvidenceType": {
+      "type": "string",
+      "description": "Category of evidence attached to a finding.",
+      "enum": [
+        "log",
+        "diff",
+        "snapshot",
+        "hash",
+        "external_report",
+        "screenshot_ref"
+      ]
+    }
+  }
+}

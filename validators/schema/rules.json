@@ -1,0 +1,42 @@
+[
+  {
+    "rule_id": "SCH-001",
+    "domain": "schema",
+    "severity": "HIGH",
+    "description": "Required field missing",
+    "requirement_id": null,
+    "version": "0.1.0"
+  },
+  {
+    "rule_id": "SCH-002",
+    "domain": "schema",
+    "severity": "HIGH",
+    "description": "Wrong type, enum, or const value not allowed",
+    "requirement_id": null,
+    "version": "0.1.0"
+  },
+  {
+    "rule_id": "SCH-003",
+    "domain": "schema",
+    "severity": "MEDIUM",
+    "description": "Pattern, format, minLength, minimum, minItems, or uniqueItems violation",
+    "requirement_id": null,
+    "version": "0.1.0"
+  },
+  {
+    "rule_id": "SCH-004",
+    "domain": "schema",
+    "severity": "MEDIUM",
+    "description": "Unknown additional property present where additionalProperties is false",
+    "requirement_id": null,
+    "version": "0.1.0"
+  },
+  {
+    "rule_id": "SCH-005",
+    "domain": "schema",
+    "severity": "MEDIUM",
+    "description": "oneOf/allOf/if-then composition constraint violated (e.g. PASSED gate with non-zero CRITICAL count)",
+    "requirement_id": null,
+    "version": "0.1.0"
+  }
+]
