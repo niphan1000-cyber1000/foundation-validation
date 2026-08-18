@@ -1,4 +1,4 @@
-﻿name: API Governance Gate
+name: API Governance Gate
 
 on:
   pull_request:
@@ -23,7 +23,27 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
+      # ── STEP 1: เช็ค spec จริงของโปรเจกต์ ──
+      # นี่คือ hard gate ตัวจริงที่ block PR ถ้า spec/registry มีปัญหา
+      - name: Run Governance Validation (Standard)
+        run: |
+          python run_all.py
+
+      # ── STEP 2: Negative control — พิสูจน์ว่าระบบ fail-closed จริง ──
+      # จงใจป้อนไฟล์ที่ไม่มีอยู่จริง คาดหวังว่า run_all.py ต้อง exit code ≠ 0
+      # ถ้า exit code ≠ 0 ตามคาด = ระบบทำงานถูกต้อง → step นี้ควร "ผ่าน"
+      # ถ้า exit code = 0 (แอบผ่านทั้งที่ spec หาไม่เจอ) = gate รั่ว → step นี้ต้อง "แดง"
       - name: Run Prove ERROR (Fail-closed System Crash Test)
         run: |
-          # บังคับรันด้วยไฟลปลอมที่ไม่ตัวตน เพื่อให้ระบบเกิด Exception และต้อง Exit Non-Zero เท่านั้น ห้ามผ่านเดดขาด
-          python run_all.py --spec non-existent-file-for-error-test.json || exit 1
+          set +e   # ปิด auto-exit ชั่วคราว เพื่อจับ exit code เอง แทนที่จะให้ shell ตายก่อน
+          python run_all.py --spec non-existent-file-for-error-test.json
+          exit_code=$?
+          set -e
+
+          if [ $exit_code -ne 0 ]; then
+            echo "✅ ยืนยันว่าระบบ fail-closed ถูกต้อง (exit code = $exit_code ตามที่คาดไว้)"
+            exit 0
+          else
+            echo "❌ ระบบไม่ fail เมื่อเจอ spec ที่ไม่มีอยู่จริง — Gate รั่ว ต้องแก้ด่วน!"
+            exit 1
+          fi
