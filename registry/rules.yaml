@@ -1,0 +1,13 @@
+﻿rules:
+  - rule_id: OAS-001
+    domain: openapi
+    severity: MEDIUM
+    enabled: true
+  - rule_id: SEC-001
+    domain: security
+    severity: CRITICAL
+    enabled: true
+  - rule_id: GOV-001
+    domain: governance
+    severity: HIGH
+    enabled: true

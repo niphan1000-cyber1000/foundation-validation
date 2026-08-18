@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://foundation-validation.cloudforge.internal/schemas/validation-request.schema.json",
+  "title": "ValidationRequest",
+  "description": "Payload to request a new validation run. Mirrors the ValidationRequest component in openapi.yaml (POST /v1/validations).",
+  "type": "object",
+  "required": ["target", "domains"],
+  "additionalProperties": false,
+  "properties": {
+    "target": { "$ref": "#/$defs/Target" },
+    "domains": {
+      "type": "array",
+      "description": "Validation domains to execute.",
+      "items": { "$ref": "#/$defs/Domain" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "ruleset_version": {
+      "type": "string",
+      "description": "Version of the rule set to apply, for reproducibility.",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "examples": ["0.1.0"]
+    },
+    "requested_by": {
+      "type": "string",
+      "description": "Requestor or trigger source (e.g. CI pipeline, user, scheduler).",
+      "minLength": 1,
+      "examples": ["ci:github-actions"]
+    },
+    "context": {
+      "type": "object",
+      "description": "Free-form metadata about the request (commit, branch, PR, etc.).",
+      "additionalProperties": true,
+      "examples": [
+        {
+          "commit_sha": "a1b2c3d",
+          "branch": "feature/validation-engine",
+          "pr_number": 42
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "Domain": {
+      "type": "string",
+      "description": "Validation domain, aligned with the validators/ folder structure.",
+      "enum": [
+        "schema",
+        "openapi",
+        "security",
+        "policy",
+        "governance",
+        "traceability"
+      ]
+    },
+    "TargetType": {
+      "type": "string",
+      "description": "Type of artifact being validated.",
+      "enum": [
+        "repository",
+        "commit",
+        "artifact",
+        "api_contract",
+        "infrastructure_config"
+      ]
+    },
+    "Target": {
+      "type": "object",
+      "description": "The artifact or system under validation.",
+      "required": ["type", "reference"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "$ref": "#/$defs/TargetType" },
+        "reference": {
+          "type": "string",
+          "description": "Identifier or location of the target (e.g. repo URL, commit SHA).",
+          "minLength": 1,
+          "examples": ["github.com/cloudforge/foundation-validation@a1b2c3d"]
+        },
+        "location": {
+          "type": "string",
+          "description": "Optional path within the target (e.g. specific file or directory).",
+          "examples": ["openapi.yaml"]
+        }
+      }
+    }
+  }
+}

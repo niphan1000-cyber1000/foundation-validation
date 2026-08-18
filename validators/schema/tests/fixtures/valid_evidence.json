@@ -1,0 +1,10 @@
+{
+  "evidence_id": "ev-0012",
+  "finding_id": "fnd-0007",
+  "type": "log",
+  "content_ref": "s3://foundation-validation-evidence/val-8f3c1a20/ev-0012.log",
+  "captured_at": "2026-08-13T09:16:10Z",
+  "integrity_hash": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+  "producer": {"name": "trivy-fs", "version": "0.53.0"},
+  "supersedes": null
+}
