@@ -1,5 +1,5 @@
 
-param([string]$TargetFile = "registry\rules.yaml")
+param([string]$TargetFile = "rules\registry.yaml")
 Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host "   MASTER CONTROL PLANE & TRACEABILITY   " -ForegroundColor Cyan
 Write-Host "=========================================" -ForegroundColor Cyan

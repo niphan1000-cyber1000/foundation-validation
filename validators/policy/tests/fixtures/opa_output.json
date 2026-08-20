@@ -1,12 +1,18 @@
-﻿{
+{
   "result": [
     {
-      "deny": [
+      "expressions": [
         {
-          "code": "001",
-          "message": "Unauthorized access to restricted resource",
-          "severity": "CRITICAL",
-          "path": "authz.allow"
+          "value": [
+            {
+              "rule_id": "SEC-003-SENSITIVE-QUERY-PARAM",
+              "severity": "CRITICAL",
+              "message": "Sensitive parameter 'token' must not be passed via query string.",
+              "path": "paths./v1/example.get.parameters.token"
+            }
+          ],
+          "text": "data.governance.api.deny",
+          "location": {"row": 1, "col": 1}
         }
       ]
     }

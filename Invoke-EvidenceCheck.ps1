@@ -1,6 +1,6 @@
 
 param(
-    [string]$TargetFile = "registry\rules.yaml"
+    [string]$TargetFile = "rules\registry.yaml"
 )
 
 Write-Host "=========================================" -ForegroundColor Cyan
@@ -16,9 +16,17 @@ if (!(Test-Path $TargetFile)) {
 $fileHash = (Get-FileHash -Path $TargetFile -Algorithm SHA256).Hash
 
 # 2. ??? Metadata ??? Environment Context
+$gitCommitSha = "unknown"
+try {
+    $gitOutput = git rev-parse HEAD 2>$null
+    if ($LASTEXITCODE -eq 0 -and $gitOutput) { $gitCommitSha = $gitOutput.Trim() }
+} catch {
+    # git not available or not a git repo — leave as "unknown" rather than faking a hash
+}
+
 $evidence = [PSCustomObject]@{
     timestamp          = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
-    git_commit_sha     = "mock-commit-sha-9f8e7d6" # ?????????? git rev-parse HEAD ????
+    git_commit_sha     = $gitCommitSha
     input_file         = $TargetFile
     input_sha256       = $fileHash
     validator_version  = "v1.0.0"

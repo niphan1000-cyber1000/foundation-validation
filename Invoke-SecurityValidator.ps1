@@ -1,5 +1,5 @@
 
-param([string]$TargetFile = "registry\rules.yaml")
+param([string]$TargetFile = "rules\registry.yaml")
 Write-Host "[*] Running Security Validator against $TargetFile..." -ForegroundColor Cyan
 
 $content = Get-Content $TargetFile -Raw

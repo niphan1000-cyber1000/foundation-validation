@@ -215,7 +215,22 @@ def _invoke_opa(spec_path, policy_dir="policies"):
         raise RuntimeError(
             f"OPA CLI produced no output (exit {proc.returncode}): {stderr[:500]}"
         )
-    return _parse_leading_json(stdout, tool_name="OPA CLI")
+    parsed = _parse_leading_json(stdout, tool_name="OPA CLI")
+
+    # `opa eval` reports Rego compile/parse errors as a 0-exit-code JSON
+    # payload shaped {"errors": [...]}, NOT as {"result": [...]}. Treating
+    # that as "zero violations found" would silently turn a broken policy
+    # file into a clean pass — the opposite of this project's fail-safe
+    # design (a tool that can't actually evaluate the policy is a hard
+    # ERROR, same as a missing/uninvokable binary).
+    if isinstance(parsed, dict) and parsed.get("errors"):
+        first_err = parsed["errors"][0] if parsed["errors"] else {}
+        loc = first_err.get("location", {}) if isinstance(first_err, dict) else {}
+        where = f"{loc.get('file', policy_dir)}:{loc.get('row', '?')}" if loc else policy_dir
+        message = first_err.get("message", "unknown error") if isinstance(first_err, dict) else str(first_err)
+        raise RuntimeError(f"OPA policy failed to compile/evaluate at {where}: {message}")
+
+    return parsed
 
 
 def run_all_validations(

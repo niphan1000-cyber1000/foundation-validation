@@ -92,20 +92,57 @@ rules:
 
   - rule_id: SEC-001-https-only
     domain: security
-    version: "1.0.0"
+    version: "1.1.0"
     severity: CRITICAL
-    title: "Server URLs must use HTTPS only"
+    title: "HTTPS is mandatory for non-loopback server endpoints"
     description: >
       Every entry in the OpenAPI "servers" array must have a "url"
-      starting with "https://". Plain HTTP server URLs are rejected.
+      starting with "https://", UNLESS the host is a loopback address
+      (exactly "localhost" or "127.0.0.1"), in which case "http://" is
+      permitted since loopback traffic never leaves the machine. This is a
+      loopback-only exception, not a general "HTTP is okay for
+      development" exception: HTTP is still rejected for private/internal
+      network ranges (e.g. 192.168.x.x, 10.x.x.x, 172.16.x.x) and internal
+      DNS names (e.g. *.internal), because those can be real, reachable
+      network endpoints where plaintext HTTP could still expose
+      credentials or tokens in transit.
     purpose: >
       Prevents API traffic (including credentials and tokens sent by
-      clients) from being transmitted over unencrypted HTTP, and stops
-      an insecure server URL from being published as part of the
-      contract that client tooling generates code against.
+      clients) from being transmitted over unencrypted HTTP on any
+      endpoint that is, or could be, reachable over a real network, while
+      still allowing local development against a loopback-only server
+      without requiring a locally-trusted TLS certificate.
     requirement_id: null
-    implementation: ".spectral.yaml (custom rule) via validators/openapi/ -> validators/run_all.py --spec"
+    implementation: ".spectral.yaml (custom rule, loopback-only regex) via validators/openapi/ -> validators/run_all.py --spec"
     evidence_type: "spec-lint-finding"
+    gate_behavior: FAIL
+    references:
+      - "https://spec.openapis.org/oas/v3.0.3#server-object"
+    status: active
+    owner: unassigned
+    introduced_version: "1.1.0"
+    deprecated_version: null
+
+  - rule_id: SEC-002-NON-HTTPS-SERVER
+    domain: security
+    version: "1.1.0"
+    severity: HIGH
+    title: "HTTPS is mandatory for non-loopback server endpoints (OPA)"
+    description: >
+      Independent OPA/Rego enforcement of the exact same invariant as
+      SEC-001-https-only (see that entry for the full rationale): HTTPS
+      is mandatory for non-loopback server endpoints, with a loopback-only
+      exception for exactly "localhost" or "127.0.0.1". This rule exists
+      as a second, independent enforcement point (policies/security.rego,
+      evaluated via `opa eval`) over the same "servers" array Spectral
+      already lints, so a gap in one tool doesn't silently pass the spec.
+    purpose: >
+      Defense in depth for the HTTPS-only server URL requirement: catches
+      the same violation as SEC-001-https-only even if the Spectral
+      ruleset is ever bypassed, misconfigured, or fails to run.
+    requirement_id: null
+    implementation: "policies/security.rego (OPA/Rego, loopback-only regex) via validators/policy/ -> validators/run_all.py --spec"
+    evidence_type: "policy-eval-finding"
     gate_behavior: FAIL
     references:
       - "https://spec.openapis.org/oas/v3.0.3#server-object"

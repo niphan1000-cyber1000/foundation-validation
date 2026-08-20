@@ -1,6 +1,21 @@
 ﻿version: "1.0"
-gate_rules:
-  block_on:
-    - error
-    - warning
-  allow_override: false
+allow_override: false
+
+# Per-validator gate policy. Consumed by src/core/engine.py::GateDecisionEngine.
+#   on_fail  -> action when the validator's state is FAIL
+#   on_error -> action when the validator's state is ERROR (crash, timeout, tool missing)
+# Actions: ALLOW | WARN | BLOCK
+# Any validator not listed here falls back to the "default" entry.
+rules:
+  spectral:
+    on_fail: BLOCK
+    on_error: BLOCK
+  opa:
+    on_fail: BLOCK
+    on_error: BLOCK
+  trivy:
+    on_fail: WARN
+    on_error: BLOCK
+  default:
+    on_fail: BLOCK
+    on_error: BLOCK

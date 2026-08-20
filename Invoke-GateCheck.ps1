@@ -1,32 +1,33 @@
 
-param([string]$InputType = "GOOD")
+param(
+    [string]$InputType = "GOOD",
+    [string]$Spec = "openapi.yaml"
+)
+
 Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host "  GOVERNANCE CONTROL PLANE - GATE CHECK  " -ForegroundColor Cyan
 Write-Host "=========================================" -ForegroundColor Cyan
-Write-Host "Mode: $InputType Input Test`n" -ForegroundColor Yellow
+Write-Host "Mode: $InputType`n" -ForegroundColor Yellow
 
-# ??????? Single Source of Truth (registry\rules.yaml)
-if (Test-Path "registry\rules.yaml") {
-    Write-Host "[*] Loading rules from Registry (registry\rules.yaml)..." -ForegroundColor Gray
-    # ???????????????? YAML ????????????????????????? rule_id
-    $registryContent = Get-Content "registry\rules.yaml"
-} else {
-    Write-Host "[!] Warning: registry\rules.yaml not found!" -ForegroundColor Red
+if (!(Test-Path "rules\registry.yaml")) {
+    Write-Host "[!] Warning: rules\registry.yaml not found!" -ForegroundColor Red
 }
 
-$findings = @()
-switch ($InputType.ToUpper()) {
-    "GOOD"  { $findings = @(@{ rule_id = "OAS-001"; severity = "MEDIUM"; status = "PASSED" }) }
-    "BAD"   { $findings = @(@{ rule_id = "SEC-001"; severity = "CRITICAL"; status = "VIOLATION" }) }
-    "ERROR" { $findings = @(@{ rule_id = "GOV-001"; severity = "HIGH"; status = "ERROR" }) }
+if ($InputType.ToUpper() -eq "ERROR" -or $InputType.ToUpper() -eq "BAD") {
+    # Negative control / failure-injection path — proves the gate fails closed.
+    # This does NOT run the real validators; it exercises run_all.py's
+    # --test-failure-injection flag the same way validators/tests/test_process_boundary.py does.
+    Write-Host "[*] Running failure-injection negative control (no real validators executed)..." -ForegroundColor Gray
+    python run_all.py --test-failure-injection
+    $exitCode = $LASTEXITCODE
+    Write-Host "GATE DECISION: $(if ($exitCode -eq 0) { 'PASS' } else { 'BLOCK/ERROR' })" -ForegroundColor $(if ($exitCode -eq 0) { "Green" } else { "Red" })
+    exit $exitCode
 }
 
-$hasError = ($findings | Where-Object { $_.status -eq "ERROR" }).Count -gt 0
-$hasViolation = ($findings | Where-Object { $_.severity -eq "CRITICAL" -or $_.severity -eq "HIGH" }).Count -gt 0
-
-$exitCode = if ($hasError -or $hasViolation) { 1 } else { 0 }
-$gateState = if ($hasError) { "ERROR" } elseif ($hasViolation) { "FAIL" } else { "PASS" }
-
-Write-Host "GATE DECISION: $gateState" -ForegroundColor $(if($exitCode -eq 0){"Green"}else{"Red"})
+# Positive control — runs the real validation engine (validators/run_all.py,
+# via the root run_all.py wrapper) against the given OpenAPI spec.
+Write-Host "[*] Running real validation engine against $Spec..." -ForegroundColor Gray
+python run_all.py --spec $Spec
+$exitCode = $LASTEXITCODE
+Write-Host "GATE DECISION: $(if ($exitCode -eq 0) { 'PASS' } else { 'BLOCK/ERROR' })" -ForegroundColor $(if ($exitCode -eq 0) { "Green" } else { "Red" })
 exit $exitCode
-

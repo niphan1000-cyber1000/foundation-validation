@@ -20,7 +20,9 @@ class TestGovernedAggregatorEngine(unittest.TestCase):
             {"code": "oas3-schema", "message": "Missing response", "severity": 0, "path": ["paths"]}
         ]
         mock_opa = {
-            "result": [{"deny": [{"code": "001", "message": "Access Denied", "severity": "HIGH"}]}]
+            "result": [{"expressions": [{"value": [
+                {"rule_id": "POL-001", "code": "001", "message": "Access Denied", "severity": "HIGH"}
+            ]}]}]
         }
 
         result = run_all_validations(openapi_json_data=mock_openapi, opa_json_data=mock_opa)
