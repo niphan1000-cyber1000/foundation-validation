@@ -53,6 +53,38 @@ def test_engine_error_triggers_failsafe_block():
     assert decision.action == GateAction.BLOCK
     assert any("ERROR" in reason for reason in decision.reasons)
 
+def test_engine_error_with_on_error_warn_still_forces_block():
+    """
+    INVARIANT (regression): ERROR must force BLOCK even when the
+    validator's own policy entry explicitly sets on_error: WARN.
+
+    test_engine_error_triggers_failsafe_block above only ever exercises
+    on_error: BLOCK, so it can't distinguish "the engine correctly forces
+    BLOCK on ERROR" from "the engine just happened to read on_error and
+    it was BLOCK anyway". This test sets on_error: WARN specifically to
+    prove GateDecisionEngine's fail-safe branch ignores policy for ERROR
+    states rather than honoring a (dangerously permissive) WARN override.
+    """
+    policy = {
+        "rules": {
+            "injected-validator": {"on_fail": "BLOCK", "on_error": "WARN"}
+        }
+    }
+    engine = GateDecisionEngine(policy)
+    results = [
+        ValidatorResult(
+            validator_name="injected-validator",
+            state=ValidationState.ERROR,
+            error_message="Simulated failure injection (CI negative control)",
+        )
+    ]
+
+    decision = engine.evaluate("run-failsafe-warn-override", results)
+    assert decision.action == GateAction.BLOCK, (
+        "on_error: WARN leaked through — an ERROR state must ALWAYS force "
+        "BLOCK regardless of policy configuration"
+    )
+
 def test_engine_with_yaml_policy():
     with open("gate_policy.yaml", "r", encoding="utf-8") as f:
         policy_data = yaml.safe_load(f)

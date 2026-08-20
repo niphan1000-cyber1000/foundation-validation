@@ -1,46 +1,483 @@
-﻿openapi: 3.0.3
+openapi: 3.0.3
 info:
-  title: Sample API
+  title: Foundation Validation API
+  description: >-
+    Central Validation Engine & Governance Quality Gate for CloudForge.
+    Executes validation runs across the Schema, OpenAPI, Security, Policy,
+    Governance, and Traceability domains, and exposes results, evidence,
+    and the rules registry for audit and CI/CD gating.
   version: 0.1.0
-  description: API for testing governance and security compliance.
   contact:
-    name: API Support
-    email: support@example.com
-  x-domain: "core"
-  x-governance-id: "GOV-001"
-  x-owner: "team-api@example.com"
+    name: CloudForge Platform Governance
+    email: platform-governance@cloudforge.internal
+  license:
+    name: Proprietary - Internal Use Only
+
 servers:
-  - url: https://api.example.com
-    description: Production server
+  - url: https://foundation-validation.cloudforge.internal/v1
+    description: Internal production endpoint
+  - url: http://localhost:8080/v1
+    description: Local development
+
 tags:
-  - name: Example
-    description: Operations about examples
+  - name: Validations
+    description: Create and query validation runs, and retrieve their evidence
+  - name: Rules
+    description: Read-only registry of validation rules
+
 security:
-  - ApiKeyAuth: []
+  - BearerAuth: []
+
 paths:
-  /v1/example:
-    get:
-      summary: Example endpoint
-      description: Retrieve sample example data endpoint for testing governance validation.
-      operationId: getExampleData
+  /v1/validations:
+    post:
+      operationId: createValidation
+      summary: Execute a validation
+      description: >-
+        Submits a target for validation. The engine queues the run,
+        executes every validator in the requested domains, and evaluates
+        the result against the Foundation Validation Spec exit criteria.
       tags:
-        - Example
+        - Validations
+      x-api-id: api-101
+      x-traceability: trace-101
+      requestBody:
+        required: true
+        description: Validation request payload
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidationRequest'
+      responses:
+        '202':
+          description: Validation request accepted and queued for execution
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationRun'
+        '400':
+          description: Invalid validation request payload
+        '401':
+          description: Unauthorized - Missing or invalid Bearer token
+
+  /v1/validations/{id}:
+    get:
+      operationId: getValidationById
+      summary: Get validation run status and result
+      description: >-
+        Returns the current status of a validation run, and once complete,
+        the gate result (PASSED/FAILED) with the full findings summary.
+      tags:
+        - Validations
+      x-api-id: api-102
+      x-traceability: trace-102
       parameters:
-        - name: apiKey
-          in: header
+        - name: id
+          in: path
           required: true
+          description: Unique identifier of the validation run
           schema:
             type: string
+            example: "val-8f3c1a20"
       responses:
         '200':
-          description: Success
-        '400':
-          description: Bad Request
-        '500':
-          description: Internal Server Error
+          description: Validation run found and returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationRun'
+        '401':
+          description: Unauthorized - Missing or invalid Bearer token
+        '404':
+          description: Validation run not found
+
+  /v1/validations/{id}/evidence:
+    get:
+      operationId: listValidationEvidence
+      summary: Retrieve the audit trail for a validation run
+      description: >-
+        Returns all evidence records collected for the run, optionally
+        filtered by finding or evidence type. Evidence records are
+        immutable per the Foundation Validation Spec.
+      tags:
+        - Validations
+      x-api-id: api-103
+      x-traceability: trace-103
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique identifier of the validation run
+          schema:
+            type: string
+            example: "val-8f3c1a20"
+        - name: finding_id
+          in: query
+          required: false
+          description: Filter evidence belonging to a specific finding
+          schema:
+            type: string
+        - name: type
+          in: query
+          required: false
+          description: Filter evidence by type
+          schema:
+            $ref: '#/components/schemas/EvidenceType'
+      responses:
+        '200':
+          description: Evidence records for the validation run
+          content:
+            application/json:
+              schema:
+                type: array
+                description: Ordered list of evidence records (by captured_at)
+                items:
+                  $ref: '#/components/schemas/Evidence'
+        '401':
+          description: Unauthorized - Missing or invalid Bearer token
+        '404':
+          description: Validation run not found
+
+  /v1/rules:
+    get:
+      operationId: listRules
+      summary: List the validation rules registry
+      description: >-
+        Returns the current set of validation rules, optionally filtered
+        by domain or severity. Used to inspect gate coverage and to
+        drive the Traceability Model.
+      tags:
+        - Rules
+      x-api-id: api-104
+      x-traceability: trace-104
+      parameters:
+        - name: domain
+          in: query
+          required: false
+          description: Filter rules by validation domain
+          schema:
+            $ref: '#/components/schemas/Domain'
+        - name: severity
+          in: query
+          required: false
+          description: Filter rules by severity level
+          schema:
+            $ref: '#/components/schemas/Severity'
+      responses:
+        '200':
+          description: Rules registry
+          content:
+            application/json:
+              schema:
+                type: array
+                description: Array of rule definitions
+                items:
+                  $ref: '#/components/schemas/Rule'
+        '401':
+          description: Unauthorized - Missing or invalid Bearer token
+
 components:
   securitySchemes:
-    ApiKeyAuth:
-      type: apiKey
-      in: header
-      name: X-API-Key
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Enter HTTP Bearer JWT token in format 'Bearer <token>'
+
+  schemas:
+    Domain:
+      type: string
+      description: Validation domain, aligned with the validators/ folder structure
+      enum:
+        - schema
+        - openapi
+        - security
+        - policy
+        - governance
+        - traceability
+
+    Severity:
+      type: string
+      description: Rule severity level, per the Foundation Validation Spec Severity Model
+      enum:
+        - CRITICAL
+        - HIGH
+        - MEDIUM
+        - LOW
+        - INFO
+
+    RunStatus:
+      type: string
+      description: Lifecycle status of a validation run
+      enum:
+        - REQUESTED
+        - QUEUED
+        - RUNNING
+        - PASSED
+        - FAILED
+        - ERRORED
+        - ARCHIVED
+
+    GateStatus:
+      type: string
+      description: Final gate decision, only present once a run has completed
+      enum:
+        - PASSED
+        - FAILED
+
+    TargetType:
+      type: string
+      description: Type of artifact being validated
+      enum:
+        - repository
+        - commit
+        - artifact
+        - api_contract
+        - infrastructure_config
+
+    EvidenceType:
+      type: string
+      description: Category of evidence attached to a finding
+      enum:
+        - log
+        - diff
+        - snapshot
+        - hash
+        - external_report
+        - screenshot_ref
+
+    Target:
+      type: object
+      description: The artifact or system under validation
+      required:
+        - type
+        - reference
+      properties:
+        type:
+          $ref: '#/components/schemas/TargetType'
+        reference:
+          type: string
+          description: Identifier or location of the target (e.g. repo URL, commit SHA)
+          example: "github.com/cloudforge/foundation-validation@a1b2c3d"
+        location:
+          type: string
+          description: Optional path within the target (e.g. specific file or directory)
+          example: "openapi.yaml"
+
+    ValidationRequest:
+      type: object
+      description: Payload to request a new validation run
+      required:
+        - target
+        - domains
+      properties:
+        target:
+          $ref: '#/components/schemas/Target'
+        domains:
+          type: array
+          description: Validation domains to execute. To run every domain, list all six values explicitly.
+          items:
+            $ref: '#/components/schemas/Domain'
+          minItems: 1
+        ruleset_version:
+          type: string
+          description: Version of the rule set to apply, for reproducibility
+          example: "0.1.0"
+        requested_by:
+          type: string
+          description: Requestor or trigger source (e.g. CI pipeline, user, scheduler)
+          example: "ci:github-actions"
+        context:
+          type: object
+          description: Free-form metadata about the request (commit, branch, PR, etc.)
+          additionalProperties: true
+          example:
+            commit_sha: "a1b2c3d"
+            branch: "feature/validation-engine"
+            pr_number: 42
+
+    Finding:
+      type: object
+      description: Result of evaluating a single rule against the target
+      required:
+        - finding_id
+        - rule_id
+        - domain
+        - severity
+        - status
+      properties:
+        finding_id:
+          type: string
+          example: "fnd-0007"
+        rule_id:
+          type: string
+          example: "SEC-003"
+        domain:
+          $ref: '#/components/schemas/Domain'
+        severity:
+          $ref: '#/components/schemas/Severity'
+        status:
+          type: string
+          description: Whether this specific finding passed or failed
+          enum:
+            - pass
+            - fail
+        message:
+          type: string
+          description: Human-readable explanation of the finding
+          example: "Hardcoded secret detected in security/policy.rego"
+        evidence_ids:
+          type: array
+          description: Evidence records that support this finding
+          items:
+            type: string
+          example: ["ev-0012", "ev-0013"]
+
+    GateResult:
+      type: object
+      description: Summary of the gate decision for a completed validation run
+      properties:
+        status:
+          $ref: '#/components/schemas/GateStatus'
+        summary:
+          type: object
+          description: Count of findings per severity level
+          properties:
+            CRITICAL:
+              type: integer
+              example: 0
+            HIGH:
+              type: integer
+              example: 0
+            MEDIUM:
+              type: integer
+              example: 2
+            LOW:
+              type: integer
+              example: 5
+            INFO:
+              type: integer
+              example: 1
+        findings:
+          type: array
+          description: All findings produced by the run
+          items:
+            $ref: '#/components/schemas/Finding'
+
+    ValidationRun:
+      type: object
+      description: A single execution instance of a validation request
+      required:
+        - id
+        - status
+        - target
+        - domains
+        - created_at
+      properties:
+        id:
+          type: string
+          example: "val-8f3c1a20"
+        status:
+          $ref: '#/components/schemas/RunStatus'
+        target:
+          $ref: '#/components/schemas/Target'
+        domains:
+          type: array
+          items:
+            $ref: '#/components/schemas/Domain'
+        ruleset_version:
+          type: string
+          example: "0.1.0"
+        requested_by:
+          type: string
+          example: "ci:github-actions"
+        context:
+          type: object
+          additionalProperties: true
+        gate_result:
+          allOf:
+            - $ref: '#/components/schemas/GateResult'
+          description: Present once the run reaches PASSED or FAILED status
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-08-13T09:15:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2026-08-13T09:16:42Z"
+
+    Evidence:
+      type: object
+      description: Immutable evidence record supporting a finding
+      required:
+        - evidence_id
+        - finding_id
+        - type
+        - content_ref
+        - captured_at
+        - integrity_hash
+      properties:
+        evidence_id:
+          type: string
+          example: "ev-0012"
+        finding_id:
+          type: string
+          example: "fnd-0007"
+        type:
+          $ref: '#/components/schemas/EvidenceType'
+        content_ref:
+          type: string
+          description: URI or content-addressable reference to the evidence payload
+          example: "s3://foundation-validation-evidence/val-8f3c1a20/ev-0012.log"
+        captured_at:
+          type: string
+          format: date-time
+          example: "2026-08-13T09:16:10Z"
+        integrity_hash:
+          type: string
+          description: SHA-256 hash of the evidence content
+          example: "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+        producer:
+          type: object
+          description: Validator or tool that generated this evidence
+          properties:
+            name:
+              type: string
+              example: "trivy-fs"
+            version:
+              type: string
+              example: "0.53.0"
+        supersedes:
+          type: string
+          description: Evidence ID this record replaces, if any
+          nullable: true
+
+    Rule:
+      type: object
+      description: Definition of a single validation rule
+      required:
+        - rule_id
+        - domain
+        - severity
+        - description
+      properties:
+        rule_id:
+          type: string
+          example: "SEC-003"
+        domain:
+          $ref: '#/components/schemas/Domain'
+        severity:
+          $ref: '#/components/schemas/Severity'
+        description:
+          type: string
+          example: "Reject requests with hardcoded secrets in tracked files"
+        requirement_id:
+          type: string
+          description: Upstream requirement or standard this rule implements
+          nullable: true
+          example: "REQ-SEC-014"
+        version:
+          type: string
+          example: "0.1.0"
