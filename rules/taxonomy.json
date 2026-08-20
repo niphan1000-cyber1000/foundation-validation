@@ -1,0 +1,36 @@
+{
+  "version": "1.1.0",
+  "severities": ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
+  "domains": {
+    "schema": {
+      "prefix": "SCH",
+      "category": "schema",
+      "description": "JSON Contract Schema validation rules"
+    },
+    "openapi": {
+      "prefix": "OAS",
+      "category": "openapi",
+      "description": "API Linting & Structure validation rules"
+    },
+    "policy": {
+      "prefix": "POL",
+      "category": "policy",
+      "description": "Open Policy Agent / Rego governance rules"
+    },
+    "security": {
+      "prefix": "SEC",
+      "category": "security",
+      "description": "Security posture and compliance rules"
+    },
+    "governance": {
+      "prefix": "GOV",
+      "category": "governance",
+      "description": "Repository governance rules (versioning, changelog, ownership, release metadata)"
+    },
+    "traceability": {
+      "prefix": "TRC",
+      "category": "traceability",
+      "description": "Traceability rules linking findings back to requirements and rule origins"
+    }
+  }
+}

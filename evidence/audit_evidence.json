@@ -1,0 +1,9 @@
+﻿{
+    "timestamp":  "2026-08-18T11:38:56Z",
+    "git_commit_sha":  "mock-commit-sha-9f8e7d6",
+    "input_file":  "registry\\rules.yaml",
+    "input_sha256":  "674E8EC78E11CEE9F55124ADF521B06B7F46553725E431117F27363CD3E2E29F",
+    "validator_version":  "v1.0.0",
+    "policy_version":  "v1.0.0",
+    "gate_decision":  "PASS"
+}

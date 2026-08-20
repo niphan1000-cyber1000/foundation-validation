@@ -1,0 +1,50 @@
+﻿extends: ["spectral:oas"]
+
+rules:
+  OAS-001-path-kebab-case:
+    description: "API paths must use kebab-case (e.g., /user-profiles, not /userProfiles)"
+    severity: error
+    given: $.paths[*]~
+    then:
+      function: pattern
+      functionOptions:
+        match: "^/([a-z0-9-]+|\\{[a-zA-Z0-9_]+\\})(Path|/[a-z0-9-]+|/\\{[a-zA-Z0-9_]+\\})*$"
+
+  OAS-002-error-responses:
+    description: "Operations should define standard 4xx and 5xx error responses"
+    severity: error
+    # The previous version of this rule used `field: "@key"` + `pattern`,
+    # which checks that EVERY response key matches ^(4|5) — that always
+    # flagged the required "200" success response too, so no valid spec
+    # could ever pass. This version instead asserts "at least one
+    # response key matches ^[45]" via the standard JSON Schema
+    # not(propertyNames(not(pattern))) idiom, which is the correct way
+    # to express an existential (rather than universal) key check.
+    given: $.paths..[get,post,put,delete,patch].responses
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          type: object
+          not:
+            propertyNames:
+              not:
+                pattern: "^[45]"
+
+  SEC-001-https-only:
+    description: >-
+      HTTPS is mandatory for non-loopback server endpoints. Plain HTTP is
+      permitted ONLY for localhost/127.0.0.1 development endpoints — it is
+      NOT permitted for private/internal network ranges (192.168.x.x,
+      10.x.x.x, 172.16-31.x.x), internal DNS names (*.internal, etc.), or
+      any other non-loopback host, since those can be reachable over a real
+      network and plaintext HTTP there can still leak credentials/tokens.
+      Keep this pattern in sync with the loopback allowlist documented in
+      rules/registry.yaml (SEC-001-https-only) and validated in
+      validators/openapi/tests/test_sec001_loopback_exception.py.
+    severity: error
+    given: $.servers[*].url
+    then:
+      function: pattern
+      functionOptions:
+        match: "^(https://.+|http://(localhost|127\\.0\\.0\\.1)(:\\d+)?(/.*)?)$"

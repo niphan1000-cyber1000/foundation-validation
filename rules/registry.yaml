@@ -1,0 +1,152 @@
+# Rule Registry
+#
+# Single source of truth for individual validation rules. Each entry
+# documents one rule that a domain validator can raise as a finding.
+#
+# This complements rules/taxonomy.json, which defines domains and their
+# rule_id prefixes (SCH, OAS, POL, SEC, GOV, TRC). Every rule_id here
+# must use a prefix defined in taxonomy.json.
+#
+# Fields:
+#   rule_id           - stable identifier, format: <PREFIX>-<NNN>[-slug]
+#   domain             - must match a domain key in taxonomy.json
+#   version             - version of this rule definition (semver)
+#   severity            - default severity if not overridden by gate policy
+#   title               - short human-readable name
+#   description         - what the rule checks
+#   purpose             - why the rule exists / what risk it mitigates
+#   requirement_id       - link to an external requirement/spec section, if any
+#   implementation       - where the check lives in code
+#   evidence_type        - what kind of evidence this rule produces
+#   gate_behavior         - default effect on the gate outcome (FAIL / WARN / INFO)
+#   references            - external docs / specs this rule is based on
+#   status                - active | deprecated | draft
+#   owner                 - team or person responsible for this rule
+#   introduced_version     - registry version this rule first appeared in
+#   deprecated_version      - registry version this rule was deprecated in (if any)
+#
+# Note: this registry currently documents custom rules defined directly
+# in .spectral.yaml. That file also extends the built-in "spectral:oas"
+# ruleset (e.g. oas3-schema), which contributes additional findings not
+# yet catalogued here. Those built-in rules should be documented
+# separately once the team decides how much of Spectral's default
+# ruleset to treat as governed vs. informational.
+#
+# Severity alignment: as of registry version 1.2.0, every custom rule's
+# "severity" field below matches the "severity" set in .spectral.yaml.
+# Keep both files in sync when changing either one.
+
+version: "1.2.0"
+
+rules:
+  - rule_id: OAS-001-path-kebab-case
+    domain: openapi
+    version: "1.0.0"
+    severity: HIGH
+    title: "API paths must use kebab-case"
+    description: >
+      Every path segment in the OpenAPI "paths" object must use
+      kebab-case (e.g. "/user-profiles"), not camelCase or snake_case
+      (e.g. not "/userProfiles"). Enforced via Spectral pattern match
+      against each path key.
+    purpose: >
+      Consistent path casing keeps the API surface predictable for
+      consumers and avoids mixed-convention endpoints accumulating
+      over time as different teams add routes.
+    requirement_id: null
+    implementation: ".spectral.yaml (custom rule) via validators/openapi/ -> validators/run_all.py --spec"
+    evidence_type: "spec-lint-finding"
+    gate_behavior: FAIL
+    references:
+      - "https://spec.openapis.org/oas/v3.0.3#paths-object"
+    status: active
+    owner: unassigned
+    introduced_version: "1.1.0"
+    deprecated_version: null
+
+  - rule_id: OAS-002-error-responses
+    domain: openapi
+    version: "1.1.0"
+    severity: HIGH
+    title: "Operations must define standard 4XX and 5XX error responses"
+    description: >
+      Every OpenAPI operation should declare response entries for the
+      4XX and 5XX status ranges, using the uppercase wildcard keys
+      "4XX" and "5XX" as defined by the OpenAPI 3.0 specification.
+      Lowercase keys ("4xx", "5xx") or missing error ranges cause this
+      rule to fail.
+    purpose: >
+      Ensures API consumers can rely on a documented, consistent error
+      contract instead of guessing failure behavior. Missing error
+      responses are a common source of undocumented client-side bugs.
+    requirement_id: null
+    implementation: ".spectral.yaml (custom rule) via validators/openapi/ -> validators/run_all.py --spec"
+    evidence_type: "spec-lint-finding"
+    gate_behavior: FAIL
+    references:
+      - "https://spec.openapis.org/oas/v3.0.3#responses-object"
+    status: active
+    owner: unassigned
+    introduced_version: "1.0.0"
+    deprecated_version: null
+
+  - rule_id: SEC-001-https-only
+    domain: security
+    version: "1.1.0"
+    severity: CRITICAL
+    title: "HTTPS is mandatory for non-loopback server endpoints"
+    description: >
+      Every entry in the OpenAPI "servers" array must have a "url"
+      starting with "https://", UNLESS the host is a loopback address
+      (exactly "localhost" or "127.0.0.1"), in which case "http://" is
+      permitted since loopback traffic never leaves the machine. This is a
+      loopback-only exception, not a general "HTTP is okay for
+      development" exception: HTTP is still rejected for private/internal
+      network ranges (e.g. 192.168.x.x, 10.x.x.x, 172.16.x.x) and internal
+      DNS names (e.g. *.internal), because those can be real, reachable
+      network endpoints where plaintext HTTP could still expose
+      credentials or tokens in transit.
+    purpose: >
+      Prevents API traffic (including credentials and tokens sent by
+      clients) from being transmitted over unencrypted HTTP on any
+      endpoint that is, or could be, reachable over a real network, while
+      still allowing local development against a loopback-only server
+      without requiring a locally-trusted TLS certificate.
+    requirement_id: null
+    implementation: ".spectral.yaml (custom rule, loopback-only regex) via validators/openapi/ -> validators/run_all.py --spec"
+    evidence_type: "spec-lint-finding"
+    gate_behavior: FAIL
+    references:
+      - "https://spec.openapis.org/oas/v3.0.3#server-object"
+    status: active
+    owner: unassigned
+    introduced_version: "1.1.0"
+    deprecated_version: null
+
+  - rule_id: SEC-002-NON-HTTPS-SERVER
+    domain: security
+    version: "1.1.0"
+    severity: HIGH
+    title: "HTTPS is mandatory for non-loopback server endpoints (OPA)"
+    description: >
+      Independent OPA/Rego enforcement of the exact same invariant as
+      SEC-001-https-only (see that entry for the full rationale): HTTPS
+      is mandatory for non-loopback server endpoints, with a loopback-only
+      exception for exactly "localhost" or "127.0.0.1". This rule exists
+      as a second, independent enforcement point (policies/security.rego,
+      evaluated via `opa eval`) over the same "servers" array Spectral
+      already lints, so a gap in one tool doesn't silently pass the spec.
+    purpose: >
+      Defense in depth for the HTTPS-only server URL requirement: catches
+      the same violation as SEC-001-https-only even if the Spectral
+      ruleset is ever bypassed, misconfigured, or fails to run.
+    requirement_id: null
+    implementation: "policies/security.rego (OPA/Rego, loopback-only regex) via validators/policy/ -> validators/run_all.py --spec"
+    evidence_type: "policy-eval-finding"
+    gate_behavior: FAIL
+    references:
+      - "https://spec.openapis.org/oas/v3.0.3#server-object"
+    status: active
+    owner: unassigned
+    introduced_version: "1.1.0"
+    deprecated_version: null

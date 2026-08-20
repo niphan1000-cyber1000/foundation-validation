@@ -1,0 +1,7 @@
+{
+  "evidence_id": "ev-0013",
+  "finding_id": "fnd-0007",
+  "type": "log",
+  "captured_at": "2026-08-13T09:16:10Z",
+  "integrity_hash": "not-a-real-sha256-hash"
+}

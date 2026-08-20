@@ -1,0 +1,39 @@
+﻿name: Governance Gate Check
+
+on:
+  push:
+    branches: [ main-new ]
+  pull_request:
+    branches: [ main-new ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: Install dependencies
+      run: pip install -r requirements.txt
+      
+    - name: Run Governance Validators
+      run: python run_all.py --spec openapi.yaml
+      
+    - name: Verify Gate Blocks on Errors
+      shell: bash
+      run: |
+        set +e
+        python run_all.py --test-failure-injection
+        rc=$?
+        set -e
+
+        if [ "$rc" -eq 0 ]; then
+          echo "::error::Failure injection unexpectedly passed. Gate is not fail-closed."
+          exit 1
+        fi
+
+        echo "Failure injection correctly returned non-zero exit code: $rc"

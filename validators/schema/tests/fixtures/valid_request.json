@@ -1,0 +1,15 @@
+{
+  "target": {
+    "type": "repository",
+    "reference": "github.com/cloudforge/foundation-validation@a1b2c3d",
+    "location": "openapi.yaml"
+  },
+  "domains": ["schema", "openapi"],
+  "ruleset_version": "0.1.0",
+  "requested_by": "ci:github-actions",
+  "context": {
+    "commit_sha": "a1b2c3d",
+    "branch": "feature/validation-engine",
+    "pr_number": 42
+  }
+}

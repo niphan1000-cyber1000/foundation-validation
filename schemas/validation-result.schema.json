@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ValidationResultContract",
+  "type": "object",
+  "required": ["execution", "status"],
+  "properties": {
+    "execution": {
+      "type": "object",
+      "required": ["execution_id", "timestamp", "platform_version", "environment"],
+      "properties": {
+        "execution_id": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "platform_version": { "type": "string" },
+        "environment": { "type": "string" }
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["PASSED", "FAILED", "ERROR", "RUNNING"]
+    },
+    "summary": {
+      "type": ["object", "null"],
+      "required": ["total_findings", "critical", "high", "medium", "low"],
+      "properties": {
+        "total_findings": { "type": "integer", "minimum": 0 },
+        "critical": { "type": "integer", "minimum": 0 },
+        "high": { "type": "integer", "minimum": 0 },
+        "medium": { "type": "integer", "minimum": 0 },
+        "low": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "findings": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "object",
+        "required": ["rule_id", "rule_version", "severity", "category", "message", "location"],
+        "properties": {
+          "rule_id": { "type": "string", "pattern": "^(SCH|OAS|POL|SEC)-[A-Za-z0-9_-]+$" },
+          "rule_version": { "type": "string" },
+          "severity": { "type": "string", "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"] },
+          "category": { "type": "string", "enum": ["schema", "openapi", "policy", "security"] },
+          "message": { "type": "string" },
+          "location": {
+            "type": "object",
+            "required": ["file", "path"],
+            "properties": {
+              "file": { "type": "string" },
+              "path": { "type": "string" },
+              "line": { "type": "integer" }
+            }
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": ["object", "null"],
+      "required": ["artifacts", "hash_digest"],
+      "properties": {
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["domain", "target_file", "rule_count"],
+            "properties": {
+              "domain": { "type": "string" },
+              "target_file": { "type": "string" },
+              "rule_count": { "type": "integer" }
+            }
+          }
+        },
+        "hash_digest": { "type": "string" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "description": "Exit Criteria #1 (spec Section 7): a PASSED gate must have zero open CRITICAL findings.",
+      "if": {
+        "required": ["status"],
+        "properties": { "status": { "const": "PASSED" } }
+      },
+      "then": {
+        "required": ["summary"],
+        "properties": {
+          "summary": {
+            "required": ["critical"],
+            "properties": { "critical": { "const": 0 } }
+          }
+        }
+      }
+    },
+    {
+      "description": "summary/findings/evidence are only allowed to be null while a run is still RUNNING; every terminal status (PASSED/FAILED/ERROR) must carry a real result.",
+      "if": {
+        "required": ["status"],
+        "properties": { "status": { "const": "RUNNING" } }
+      },
+      "else": {
+        "required": ["summary", "findings", "evidence"],
+        "properties": {
+          "summary": { "type": "object" },
+          "findings": { "type": "array" },
+          "evidence": { "type": "object" }
+        }
+      }
+    }
+  ]
+}

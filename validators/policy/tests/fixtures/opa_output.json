@@ -1,0 +1,20 @@
+{
+  "result": [
+    {
+      "expressions": [
+        {
+          "value": [
+            {
+              "rule_id": "SEC-003-SENSITIVE-QUERY-PARAM",
+              "severity": "CRITICAL",
+              "message": "Sensitive parameter 'token' must not be passed via query string.",
+              "path": "paths./v1/example.get.parameters.token"
+            }
+          ],
+          "text": "data.governance.api.deny",
+          "location": {"row": 1, "col": 1}
+        }
+      ]
+    }
+  ]
+}

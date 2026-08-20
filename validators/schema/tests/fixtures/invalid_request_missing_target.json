@@ -1,0 +1,5 @@
+{
+  "domains": ["schema", "not_a_real_domain"],
+  "ruleset_version": "0.1.0",
+  "requested_by": "ci:github-actions"
+}
