@@ -7,6 +7,9 @@ info:
     Governance, and Traceability domains, and exposes results, evidence,
     and the rules registry for audit and CI/CD gating.
   version: 0.1.0
+  x-governance-id: "GOV-FOUNDATION-VALIDATION-001"
+  x-owner: "CloudForge Platform Governance"
+  x-domain: "governance"
   contact:
     name: CloudForge Platform Governance
     email: platform-governance@cloudforge.internal
