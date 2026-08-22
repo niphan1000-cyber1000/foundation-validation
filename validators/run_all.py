@@ -1,5 +1,5 @@
-"""
-run_all.py — Foundation Validation Engine master gate.
+﻿"""
+run_all.py â€” Foundation Validation Engine master gate.
 
 Aggregates findings from the OpenAPI (Spectral) and Policy (OPA) domains,
 resolves each finding's severity/gate_behavior against rules/registry.yaml
@@ -7,11 +7,11 @@ resolves each finding's severity/gate_behavior against rules/registry.yaml
 ValidationResultContract object matching schemas/validation-result.schema.json.
 
 Two entry points:
-  * run_all_validations(...)  — importable function, used by tests and by
+  * run_all_validations(...)  â€” importable function, used by tests and by
     anything that wants to inject already-fetched tool output (openapi_json_data /
     opa_json_data) instead of shelling out to spectral/opa. This is what
     validators/tests/test_aggregator.py exercises.
-  * CLI (`python run_all.py --spec ...`) — the real gate used by CI and the
+  * CLI (`python run_all.py --spec ...`) â€” the real gate used by CI and the
     pre-commit hook. It invokes Spectral and OPA itself, then calls
     run_all_validations() with the live output.
 
@@ -22,7 +22,7 @@ this repo):
   * A tool (spectral/opa) that can't be invoked is a hard ERROR, not a
     silent "no findings".
   * A rule_id with no entry in rules/registry.yaml still gets a fail-safe
-    default gate_behavior based on severity — it is never silently ignored.
+    default gate_behavior based on severity â€” it is never silently ignored.
 """
 
 import argparse
@@ -99,9 +99,10 @@ def _resolve_finding(finding, registry, environment):
         gate_behavior = str(rule_meta.get("gate_behavior", "FAIL")).upper()
         finding["rule_version"] = rule_meta.get("version", "0.0.0")
     else:
-        severity = str(finding.get("severity", "MEDIUM")).upper()
-        gate_behavior = _DEFAULT_GATE_BEHAVIOR_BY_SEVERITY.get(severity, "WARN")
-        finding.setdefault("rule_version", "unregistered")
+        # FIX: Fail-safe default for unknown/unregistered rules (Block by default)
+        severity = "CRITICAL"
+        gate_behavior = "FAIL"
+        finding["rule_version"] = "unknown"
 
     policy = GATE_POLICIES.get(environment, GATE_POLICIES["production"])
     effective_gate_behavior = policy.get((severity, gate_behavior), gate_behavior)
@@ -118,7 +119,7 @@ def _resolve_executable(name):
 
     shutil.which() checks PATHEXT on Windows (so it correctly finds e.g.
     npx.cmd for "npx"), which subprocess.run([name, ...]) does NOT do on
-    its own when shell=False — that mismatch is what produced
+    its own when shell=False â€” that mismatch is what produced
     "WinError 2: The system cannot find the file specified" for a tool
     that clearly works fine when typed directly into PowerShell. Returns
     None if the tool truly isn't on PATH.
@@ -132,7 +133,7 @@ def _parse_leading_json(text, tool_name):
 
     Some CLI wrappers (notably `npx` on Windows, and sometimes OPA)
     print a valid JSON payload to stdout immediately followed by an
-    unrelated notice/warning line with no separating newline — a plain
+    unrelated notice/warning line with no separating newline â€” a plain
     json.loads() then fails with "Extra data" even though the tool's
     actual output was perfectly valid. json.JSONDecoder.raw_decode()
     parses only the leading value and reports where it ended, which is
@@ -164,7 +165,7 @@ def _invoke_spectral(spec_path):
     can't be invoked at all."""
     npx = _resolve_executable("npx")
     if not npx:
-        raise RuntimeError("npx not found on PATH — is Node.js installed?")
+        raise RuntimeError("npx not found on PATH â€” is Node.js installed?")
     try:
         proc = subprocess.run(
             [npx, "--yes", "@stoplight/spectral-cli", "lint", str(spec_path), "-f", "json"],
@@ -177,7 +178,7 @@ def _invoke_spectral(spec_path):
 
     stdout = (proc.stdout or "").strip()
     if not stdout:
-        # A clean Spectral lint with `-f json` still prints "[]" — empty
+        # A clean Spectral lint with `-f json` still prints "[]" â€” empty
         # stdout means the CLI itself didn't run (missing package, no
         # network, bad invocation, etc.), which is a system error, not
         # "no findings". Surface stderr so the real cause is visible.
@@ -197,7 +198,7 @@ def _invoke_opa(spec_path, policy_dir="policies"):
         return None
     opa = _resolve_executable("opa")
     if not opa:
-        raise RuntimeError("opa not found on PATH — is OPA CLI installed?")
+        raise RuntimeError("opa not found on PATH â€” is OPA CLI installed?")
     try:
         proc = subprocess.run(
             [opa, "eval", "--data", policy_dir, "--input", str(spec_path),
@@ -220,7 +221,7 @@ def _invoke_opa(spec_path, policy_dir="policies"):
     # `opa eval` reports Rego compile/parse errors as a 0-exit-code JSON
     # payload shaped {"errors": [...]}, NOT as {"result": [...]}. Treating
     # that as "zero violations found" would silently turn a broken policy
-    # file into a clean pass — the opposite of this project's fail-safe
+    # file into a clean pass â€” the opposite of this project's fail-safe
     # design (a tool that can't actually evaluate the policy is a hard
     # ERROR, same as a missing/uninvokable binary).
     if isinstance(parsed, dict) and parsed.get("errors"):
@@ -248,7 +249,7 @@ def run_all_validations(
     it has already shelled out to spectral/opa) inject already-fetched raw
     tool output instead of this function invoking the tools itself. When
     neither injected data nor a spec_path is given, both domains are
-    SKIPPED and the result is an empty PASS — this is what lets
+    SKIPPED and the result is an empty PASS â€” this is what lets
     run_all_validations() be called with no arguments in unit tests.
     """
     registry = load_registry(registry_path)
@@ -394,7 +395,7 @@ def _write_sarif(result, sarif_path, registry):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Foundation Validation Engine — master gate")
+    parser = argparse.ArgumentParser(description="Foundation Validation Engine â€” master gate")
     parser.add_argument("--spec", required=True, help="Path to the OpenAPI spec file to validate")
     parser.add_argument("--sarif", help="Path to write a SARIF report to")
     parser.add_argument("--output", help="Path to write the full ValidationResultContract JSON to")
@@ -435,3 +436,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
