@@ -1,4 +1,4 @@
-﻿name: API Governance Gate
+name: API Governance Gate
 
 on:
   pull_request:
@@ -25,5 +25,13 @@ jobs:
 
       - name: Run Prove ERROR (Fail-closed System Crash Test)
         run: |
-          # บังคับรันด้วยไฟลปลอมที่ไม่ตัวตน เพื่อให้ระบบเกิด Exception และต้อง Exit Non-Zero เท่านั้น ห้ามผ่านเดดขาด
-          python run_all.py --spec non-existent-file-for-error-test.json || exit 1
+          # บังคับรันด้วยไฟล์ปลอมที่ไม่มีตัวตน เพื่อให้ระบบเกิด Exception และต้อง Exit Non-Zero เท่านั้น ห้ามผ่านเด็ดขาด
+          # Step PASSES only if the system correctly fails-closed (non-zero exit) on the missing spec file.
+          # If the system exits 0 here, that IS the fail-open bug this test exists to catch.
+          if python run_all.py --spec non-existent-file-for-error-test.json; then
+            echo "::error::FAIL-OPEN DETECTED: system exited 0 on a missing spec file instead of crashing"
+            exit 1
+          else
+            echo "PASS: system correctly failed-closed (non-zero exit) on missing spec file"
+            exit 0
+          fi
