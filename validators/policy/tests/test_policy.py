@@ -71,6 +71,58 @@ class TestPolicyEngine(unittest.TestCase):
         self.assertEqual(findings[0]["rule_id"], "GOV-002-INVALID-SEMVER")
 
 
+class TestMissingRuleIdUsesExplicitErrorMarker(unittest.TestCase):
+    """
+    Regression tests for hardening the rule_id fallback behavior.
+
+    Previously, a violation object with no "rule_id" fell back to a
+    fabricated f"POL-{code}" (e.g. "POL-001"), and a bare string
+    violation fell back to a hardcoded "POL-001" — both use the real
+    "POL" taxonomy prefix (see rules/taxonomy.json) but were never
+    entries in rules/registry.yaml, so they looked like catalogued rules
+    in the evidence trail when they were actually just "this payload had
+    no real rule_id". These tests assert the fallback now produces an
+    unmistakable "UNRESOLVED-RULE-ID:..." marker instead of a
+    plausible-looking fake rule_id.
+    """
+
+    def test_bare_string_violation_gets_unresolved_marker_not_pol_001(self):
+        raw_data = {"result": [{"expressions": [{"value": ["Some raw string violation"]}]}]}
+        findings = parse_opa_output(raw_data, target_path="openapi.yaml")
+        self.assertEqual(len(findings), 1)
+        self.assertTrue(findings[0]["rule_id"].startswith("UNRESOLVED-RULE-ID:"))
+        self.assertNotEqual(findings[0]["rule_id"], "POL-001")
+
+    def test_dict_violation_missing_rule_id_with_code_preserves_code(self):
+        raw_data = {"result": [{"expressions": [{"value": [
+            {"code": "007", "message": "legacy payload violation", "severity": "HIGH"}
+        ]}]}]}
+        findings = parse_opa_output(raw_data, target_path="openapi.yaml")
+        self.assertEqual(len(findings), 1)
+        rule_id = findings[0]["rule_id"]
+        self.assertTrue(rule_id.startswith("UNRESOLVED-RULE-ID:"))
+        self.assertIn("007", rule_id)
+        self.assertNotEqual(rule_id, "POL-007")
+
+    def test_dict_violation_missing_rule_id_and_code(self):
+        raw_data = {"result": [{"expressions": [{"value": [
+            {"message": "no rule_id, no code", "severity": "HIGH"}
+        ]}]}]}
+        findings = parse_opa_output(raw_data, target_path="openapi.yaml")
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0]["rule_id"], "UNRESOLVED-RULE-ID:missing-rule_id")
+
+    def test_real_rule_id_is_unaffected(self):
+        # Sanity check: a violation that DOES carry a real rule_id must
+        # never be touched by the fallback logic.
+        raw_data = {"result": [{"expressions": [{"value": [
+            {"rule_id": "SEC-002-NON-HTTPS-SERVER", "code": "irrelevant", "severity": "HIGH",
+             "message": "still real", "path": "servers[0].url"}
+        ]}]}]}
+        findings = parse_opa_output(raw_data, target_path="openapi.yaml")
+        self.assertEqual(findings[0]["rule_id"], "SEC-002-NON-HTTPS-SERVER")
+
+
 class TestSec002LoopbackException(unittest.TestCase):
     """
     Mirrors validators/openapi/tests/test_sec001_loopback_exception.py,

@@ -43,7 +43,17 @@ class OPAValidator:
                     value = expr.get("value", [])
                     for item in value:
                         if isinstance(item, dict):
-                            rule_id = str(item.get("rule_id", "GOV-POLICY-DENY"))
+                            raw_rule_id = item.get("rule_id")
+                            # FIX: A missing rule_id from OPA output must never be
+                            # disguised as a plausible-looking registered rule (the
+                            # old default "GOV-POLICY-DENY" used the real GOV-
+                            # taxonomy prefix but was never in rules/registry.yaml,
+                            # which would mislead anyone reading the evidence trail
+                            # into thinking it was a catalogued rule). Use an
+                            # explicit, unmistakable error marker instead, so this
+                            # is legible as "OPA output was missing rule_id" rather
+                            # than as a real policy violation.
+                            rule_id = str(raw_rule_id) if raw_rule_id else "UNRESOLVED-RULE-ID:opa-output-missing-rule_id"
                             severity = str(item.get("severity", "HIGH")).upper()
                             message = str(item.get("message", "Policy violation detected"))
                             path_str = str(item.get("path", ""))

@@ -55,14 +55,36 @@ def parse_opa_output(opa_data, target_path=""):
 
     for v in violations:
         if isinstance(v, str):
-            msg, rule_id, severity, path = v, "POL-001", "HIGH", "policy.deny"
+            # FIX: A bare string violation has no rule_id at all. The old
+            # hardcoded "POL-001" used a real taxonomy prefix (POL) but was
+            # never registered in rules/registry.yaml, so it looked like a
+            # catalogued rule in the evidence trail when it was actually
+            # just "we got a plain string with no structured rule_id".
+            # Use an explicit, unmistakable error marker instead.
+            msg, rule_id, severity, path = v, "UNRESOLVED-RULE-ID:bare-string-violation-no-rule_id", "HIGH", "policy.deny"
         elif isinstance(v, dict):
             msg = v.get("message", "Policy violation detected")
             # Rego violation objects (see policies/*.rego) set "rule_id"
-            # directly, e.g. "SEC-002-NON-HTTPS-SERVER". Fall back to the
-            # POL-{code} convention only for payloads that use the older
-            # "code" field instead.
-            rule_id = v.get("rule_id") or f"POL-{v.get('code', '001')}"
+            # directly, e.g. "SEC-002-NON-HTTPS-SERVER". Older payloads may
+            # use a "code" field instead of "rule_id" entirely.
+            #
+            # FIX: previously this fell back to f"POL-{code}" (e.g.
+            # "POL-001"), which fabricates a plausible-looking, real-prefix
+            # rule_id that is NOT in rules/registry.yaml. That silently
+            # disguises "this payload never had a real rule_id" as if it
+            # were a specific, catalogued policy rule. Use an explicit
+            # error marker instead, preserving the raw code (if any) for
+            # debugging without pretending it's a registered rule.
+            raw_rule_id = v.get("rule_id")
+            if raw_rule_id:
+                rule_id = raw_rule_id
+            else:
+                code = v.get("code")
+                rule_id = (
+                    f"UNRESOLVED-RULE-ID:missing-rule_id(code={code})"
+                    if code is not None
+                    else "UNRESOLVED-RULE-ID:missing-rule_id"
+                )
             severity = v.get("severity", "HIGH")
             path = v.get("path", "policy.deny")
         else:
