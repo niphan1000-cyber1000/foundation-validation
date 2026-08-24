@@ -42,3 +42,32 @@ jobs:
         fi
 
         echo "Failure injection correctly returned non-zero exit code: $rc"
+
+  security-policy-unit-tests:
+    # Separate job from `validate` on purpose: this only unit-tests the Rego
+    # logic in security/security-policies.rego via `opa test`, which is
+    # unrelated to the OpenAPI-spec governance/security policies in
+    # policies/*.rego that the `validate` job's `opa eval` step checks.
+    # Keeping it separate means a broken security-policy unit test blocks
+    # merges without being confused with (or masked by) the main gate job.
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install OPA CLI
+      run: |
+        # security/*.rego uses `import rego.v1`, which requires OPA >= 0.59.0.
+        # This is intentionally a different (newer) pinned version than the
+        # `validate` job's OPA install above (v0.55.0), which evaluates the
+        # older v0-syntax policies/*.rego files and must not be bumped as
+        # part of this change. Each job installs its own OPA binary, so the
+        # two pinned versions do not conflict.
+        sudo wget -O /usr/local/bin/opa https://openpolicyagent.org/downloads/v1.19.0/opa_linux_amd64_static
+        sudo chmod +x /usr/local/bin/opa
+
+    - name: Run security policy unit tests
+      run: |
+        # `opa test` fails closed by default: a test failure, a missing
+        # test, or a parse/compile error in any .rego file under security/
+        # all produce a non-zero exit code with no extra flag needed here.
+        opa test security/ -v
