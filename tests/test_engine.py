@@ -85,6 +85,56 @@ def test_engine_error_with_on_error_warn_still_forces_block():
         "BLOCK regardless of policy configuration"
     )
 
+def test_engine_unknown_validator_honors_configured_default_warn():
+    """
+    Regression test (code review finding, engine.py default-policy bug):
+    a validator with no entry in rules must fall back to rules["default"]
+    -- not to the whole `rules` mapping, which has no "on_fail" key of its
+    own and was silently forcing BLOCK regardless of what "default" said.
+    Here ops explicitly configured default.on_fail = WARN, so an unknown
+    validator's FAIL must resolve to WARN, not BLOCK.
+    """
+    policy = {
+        "rules": {
+            "spectral": {"on_fail": "BLOCK", "on_error": "BLOCK"},
+            "default": {"on_fail": "WARN", "on_error": "BLOCK"},
+        }
+    }
+    engine = GateDecisionEngine(policy)
+    results = [
+        ValidatorResult(validator_name="mystery_validator", state=ValidationState.FAIL, findings_count=1)
+    ]
+
+    decision = engine.evaluate("run-default-warn", results)
+    assert decision.action == GateAction.WARN, (
+        "unknown validator ignored the configured 'default: on_fail: WARN' "
+        "policy entry and fell back to BLOCK instead"
+    )
+
+def test_engine_unknown_validator_with_no_default_entry_fails_safe_to_block():
+    """Companion to the test above: if there is no 'default' entry at all,
+    an unknown validator's FAIL must still fail-safe to BLOCK."""
+    policy = {"rules": {"spectral": {"on_fail": "WARN", "on_error": "BLOCK"}}}
+    engine = GateDecisionEngine(policy)
+    results = [
+        ValidatorResult(validator_name="mystery_validator", state=ValidationState.FAIL, findings_count=1)
+    ]
+
+    decision = engine.evaluate("run-no-default", results)
+    assert decision.action == GateAction.BLOCK
+
+def test_engine_malformed_rules_value_does_not_crash():
+    """Regression test: a malformed policy (rules is not a dict) must
+    fail-safe to BLOCK, not raise an unhandled AttributeError."""
+    policy = {"rules": "not-a-dict"}
+    engine = GateDecisionEngine(policy)
+    results = [
+        ValidatorResult(validator_name="anything", state=ValidationState.FAIL, findings_count=1)
+    ]
+
+    decision = engine.evaluate("run-malformed-policy", results)
+    assert decision.action == GateAction.BLOCK
+
 def test_engine_with_yaml_policy():
     with open("gate_policy.yaml", "r", encoding="utf-8") as f:
         policy_data = yaml.safe_load(f)

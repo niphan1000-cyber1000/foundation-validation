@@ -9,13 +9,22 @@ class GateDecisionEngine:
         actions: List[GateAction] = []
         reasons: List[str] = []
 
+        rules = self.policy.get("rules", {})
+        if not isinstance(rules, dict):
+            rules = {}
+        fail_safe_default = {"on_fail": "BLOCK", "on_error": "BLOCK"}
+
         for res in results:
-            validator_policy = self.policy.get("rules", {}).get(
-                res.validator_name, 
-                self.policy.get("rules", {"default": {"on_fail": "BLOCK", "on_error": "BLOCK"}})
-            )
+            # Look up the validator's own policy entry; if it isn't listed,
+            # fall back to rules["default"]; if that's missing too (or the
+            # policy is malformed), fall back to the hardcoded fail-safe
+            # default. This must never silently resolve to the *whole*
+            # rules mapping, which has no "on_fail"/"on_error" keys of its
+            # own and would defeat any configured "default" entry.
+            validator_policy = rules.get(res.validator_name)
             if not isinstance(validator_policy, dict):
-                validator_policy = {"on_fail": "BLOCK", "on_error": "BLOCK"}
+                default_policy = rules.get("default")
+                validator_policy = default_policy if isinstance(default_policy, dict) else fail_safe_default
 
             if res.state == ValidationState.ERROR:
                 actions.append(GateAction.BLOCK)
