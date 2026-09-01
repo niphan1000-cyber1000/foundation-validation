@@ -46,7 +46,7 @@ for sub in ("openapi", "policy"):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-from openapi_engine import parse_spectral_output  # noqa: E402
+from openapi_engine import parse_spectral_output, SpectralOutputError  # noqa: E402
 from policy_engine import parse_opa_output  # noqa: E402
 
 PLATFORM_VERSION = "1.0.0"
@@ -275,7 +275,17 @@ def run_all_validations(
         domains_status["openapi"] = "SKIPPED"
 
     if raw is not None:
-        openapi_findings = parse_spectral_output(raw, target_path=str(spec_path or ""))
+        try:
+            openapi_findings = parse_spectral_output(raw, target_path=str(spec_path or ""))
+        except SpectralOutputError as e:
+            # A Spectral invocation that "succeeded" (non-empty stdout) but
+            # produced output we can't actually interpret must not be
+            # silently treated as zero findings - that would disable this
+            # entire validation domain without anyone noticing. Downgrade
+            # to the same ERROR path as an invocation failure.
+            openapi_findings = []
+            domains_status["openapi"] = "ERROR"
+            system_errors.append(f"openapi: {e}")
         for f in openapi_findings:
             f["category"] = "openapi"
         findings.extend(openapi_findings)

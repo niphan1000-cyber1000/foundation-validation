@@ -1,24 +1,45 @@
 ﻿import json
 
+class SpectralOutputError(ValueError):
+    """Raised when Spectral's JSON output isn't shaped as expected.
+
+    Deliberately a hard failure, not a silent []: a Spectral CLI that
+    ran successfully (non-empty stdout, exit handled upstream) but
+    produced output in an unexpected shape (wrapped under a key,
+    version-format change, etc.) must not be silently treated as "zero
+    findings" -- that would make the entire OpenAPI/Spectral domain a
+    silent no-op pass, indistinguishable from a genuinely clean spec.
+    """
+
+
 def parse_spectral_output(spectral_json_data, target_path=""):
     """
     Parses Spectral JSON output and maps it into Unified Finding format.
+
+    Raises SpectralOutputError (not a silent []) if spectral_json_data
+    isn't shaped as Spectral's `-f json` reporter actually produces: a
+    bare JSON array of finding objects. An empty array ([]) is a valid,
+    legitimate "zero findings" result and is NOT an error.
     """
-    findings = []
-    
     if isinstance(spectral_json_data, str):
         try:
             results = json.loads(spectral_json_data)
-        except json.JSONDecodeError:
-            return findings
-    elif isinstance(spectral_json_data, list):
-        results = spectral_json_data
+        except json.JSONDecodeError as e:
+            raise SpectralOutputError(
+                f"Spectral output was not valid JSON: {e}"
+            ) from e
     else:
-        return findings
+        results = spectral_json_data
 
     if not isinstance(results, list):
-        return findings
+        raise SpectralOutputError(
+            "Spectral output was not a JSON array as expected "
+            f"(got {type(results).__name__}: {str(results)[:200]!r}). "
+            "Treating this as zero findings would silently disable the "
+            "entire OpenAPI/Spectral validation domain."
+        )
 
+    findings = []
     _KNOWN_PREFIXES = ("SCH-", "OAS-", "POL-", "SEC-", "GOV-", "TRC-")
 
     for item in results:
