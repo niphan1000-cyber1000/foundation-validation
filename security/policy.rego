@@ -11,19 +11,38 @@ import rego.v1
 # package is trusted implicitly, and no bypass or force-fail flag exists
 # in this file.
 #
-# NOTE: NOT CURRENTLY WIRED INTO THE CI GATE (code review finding, see PR
-# history): `data.main.allow` (this file) and `data.policies.security.*`
-# (security-policies.rego) are exercised by `opa test security/` in the
-# `security-policy-unit-tests` CI job — that job proves the *rules
-# themselves* are correct in isolation. It does NOT mean these rules are
-# consulted by GateDecisionEngine when deciding to block a PR: the
-# real OpenAPI-spec gate (validators/run_all.py::_invoke_opa) only loads
-# `--data policies/` and queries `data.governance.api.deny`, which never
-# touches `data.main` or `data.policies.security`. A green
-# security-policy-unit-tests run is evidence the auth/password-strength
-# logic here is *correct*, not evidence it is *enforced* on anything.
-# If/when this domain is wired into the real gate, update this comment
-# and cli.py/run_all.py's _DOMAINS wiring together.
+# NOTE: NOT CURRENTLY WIRED INTO THE CI GATE — and it is NOT simply a
+# missing wire-up. `data.main.allow` (this file) and
+# `data.policies.security.*` (security-policies.rego) evaluate a
+# RUNTIME HTTP REQUEST shape (`input.headers.authorization`,
+# `input.body.password` — see security-policies_test.rego), not an
+# OpenAPI spec. The real spec gate (validators/run_all.py::_invoke_opa)
+# calls `opa eval --input <spec_path> --data policies/
+# data.governance.api.deny`, where `input` is the parsed OpenAPI
+# document (input.info / input.paths / input.servers, as used by
+# policies/security.rego). Those two input shapes are incompatible:
+# an OpenAPI spec document never has `input.headers` or `input.body`,
+# so naively adding `data.policies.security.allow` as a condition
+# evaluated against the same spec input would make `allow` false for
+# every spec and BLOCK every PR unconditionally — not close a security
+# gap, but break the gate outright.
+#
+# This is why `security-policy-unit-tests` is intentionally its own CI
+# job (see .github/workflows/governance.yml): it proves the auth/
+# password-strength Rego logic here is *correct* in isolation via
+# `opa test`, not that it is *enforced* anywhere. There is currently no
+# runtime request-time enforcement point (API gateway, middleware, etc.)
+# in this codebase for this policy to attach to.
+#
+# The intended home for this logic is the not-yet-built
+# `validators/security/` domain (see validators/security/README.md,
+# Status: "Not yet implemented") — a target-based validator (scans a
+# repository/commit/artifact for secrets, CVEs, IaC misconfig, and
+# auth/policy issues), which is a materially larger build than adding
+# a line to run_all.py's OPA invocation. Do not wire this file into
+# validators/run_all.py::_invoke_opa or cli.py's _DOMAINS as a shortcut;
+# build validators/security/run.py against its own request/target input
+# instead, then wire that.
 
 default allow := false
 
