@@ -2,3 +2,5 @@
 *.pyc
 validation-result.json
 results.sarif
+
+evidence_output/
