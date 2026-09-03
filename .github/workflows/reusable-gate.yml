@@ -1,0 +1,124 @@
+name: Reusable Governance Gate
+
+# Called by a Studio repo like:
+#
+#   jobs:
+#     gate:
+#       uses: niphan1000-cyber1000/foundation-validation/.github/workflows/reusable-gate.yml@v1
+#       with:
+#         spec_path: openapi.yaml
+#       secrets:
+#         foundation_pat: ${{ secrets.FOUNDATION_PAT }}
+#
+# MVP scope (deliberately narrow, per the phased rollout plan):
+#   - Lints spec_path against the Foundation's OWN .spectral.yaml (SSOT),
+#     not this engine's bundled one.
+#   - Also runs the OPA/policy domain against the Foundation's policies/
+#     directory if one exists there; if it doesn't (true today — the
+#     Foundation repo currently only defines Spectral rules for API specs,
+#     no OPA rego), that domain is skipped automatically rather than
+#     erroring — this is existing behavior in validators/run_all.py, not
+#     new logic added for this workflow.
+#   - Does not yet support multiple specs per call, custom gate_policy.yaml
+#     overrides from the Studio, or SARIF upload — those are follow-ups
+#     once this MVP is proven working end-to-end.
+
+on:
+  workflow_call:
+    inputs:
+      spec_path:
+        description: "Path (relative to the calling Studio repo's root) to the OpenAPI spec to validate."
+        required: true
+        type: string
+      foundation_repo:
+        description: "owner/repo of the Foundation SSOT repo to pull policy/ruleset from."
+        required: false
+        type: string
+        default: "CloudForge-Platform-Foundation-dev/CloudForge-Platform-Foundation"
+      foundation_ref:
+        description: "Git ref (branch/tag) of the Foundation repo to check out."
+        required: false
+        type: string
+        default: "main"
+      engine_ref:
+        description: "Git ref (tag) of this foundation-validation repo to check out and run. Pin this explicitly in callers; it is NOT inferred from the @ref used to call this workflow."
+        required: false
+        type: string
+        default: "v1"
+      environment:
+        description: "Gate policy environment (production = strict, dev = relaxed)."
+        required: false
+        type: string
+        default: "production"
+    secrets:
+      foundation_pat:
+        description: "Fine-grained PAT with read-only 'contents' access to the (private) Foundation repo."
+        required: true
+    outputs:
+      gate-result:
+        description: "ALLOW / WARN / BLOCK"
+        value: ${{ jobs.gate.outputs.gate-result }}
+      findings-count:
+        description: "Total count of blocking findings across all domains."
+        value: ${{ jobs.gate.outputs.findings-count }}
+      evidence-hash:
+        description: "SHA-256 of the evidence chain backing this gate decision."
+        value: ${{ jobs.gate.outputs.evidence-hash }}
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      gate-result: ${{ steps.run_gate.outputs.gate-result }}
+      findings-count: ${{ steps.run_gate.outputs.findings-count }}
+      evidence-hash: ${{ steps.run_gate.outputs.evidence-hash }}
+    steps:
+      - name: Checkout calling Studio repo
+        uses: actions/checkout@v4
+
+      - name: Checkout Foundation (policy/ruleset SSOT)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.foundation_repo }}
+          ref: ${{ inputs.foundation_ref }}
+          path: foundation
+          token: ${{ secrets.foundation_pat }}
+
+      - name: Checkout foundation-validation engine
+        uses: actions/checkout@v4
+        with:
+          repository: niphan1000-cyber1000/foundation-validation
+          ref: ${{ inputs.engine_ref }}
+          path: engine
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Set up Node (for Spectral CLI)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install OPA CLI
+        run: |
+          curl -L -o opa https://openpolicyagent.org/downloads/v0.55.0/opa_linux_amd64_static
+          chmod +x opa
+          sudo mv opa /usr/local/bin/opa
+
+      - name: Install engine dependencies
+        run: pip install -r requirements.txt
+        working-directory: engine
+
+      - name: Run Governance Gate
+        id: run_gate
+        working-directory: engine
+        run: |
+          python -m src.cli \
+            --spec "../${{ inputs.spec_path }}" \
+            --policy gate_policy.yaml \
+            --registry rules/registry.yaml \
+            --ruleset "../foundation/.spectral.yaml" \
+            --opa-policy-dir "../foundation/policies" \
+            --env "${{ inputs.environment }}"

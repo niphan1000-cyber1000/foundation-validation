@@ -21,6 +21,7 @@ import yaml
 
 from src.core.models import ValidatorResult, ValidationState, GateAction
 from src.core.engine import GateDecisionEngine
+from src.core.evidence import EvidenceCollector
 
 # validators/run_all.py is a standalone module (not a package import path),
 # so it needs its directory on sys.path the same way validators/run_all.py
@@ -58,6 +59,9 @@ def run_gate_check(
     policy_path: str = "gate_policy.yaml",
     registry_path: str = "rules/registry.yaml",
     environment: str = "production",
+    opa_policy_dir: str = "policies",
+    ruleset_path: str = None,
+    evidence_dir: str = "evidence_output",
 ) -> int:
     print(f"[*] Loading gate policy from {policy_path}...")
     try:
@@ -71,6 +75,8 @@ def run_gate_check(
     validation_result = run_all_validations(
         spec_path=Path(spec_path),
         registry_path=registry_path,
+        policy_dir=opa_policy_dir,
+        ruleset_path=ruleset_path,
         environment=environment,
     )
 
@@ -92,10 +98,52 @@ def run_gate_check(
     engine = GateDecisionEngine(policy_data)
     decision = engine.evaluate(run_id=validation_result["execution"]["execution_id"], results=results)
 
+    # Evidence chain: record what was actually checked (inputs) and what
+    # came out (per-domain results + final decision), then hash it so the
+    # decision has a short, verifiable fingerprint independent of shipping
+    # the full evidence file around (e.g. as a workflow_call output).
+    evidence = EvidenceCollector(run_id=decision.run_id, output_dir=evidence_dir)
+    evidence.add_evidence("inputs", {
+        "spec_path": str(spec_path),
+        "registry_path": str(registry_path),
+        "opa_policy_dir": str(opa_policy_dir),
+        "ruleset_path": str(ruleset_path) if ruleset_path else None,
+        "environment": environment,
+    })
+    evidence.add_evidence("domain_results", [
+        {
+            "validator_name": r.validator_name,
+            "state": r.state.value,
+            "findings_count": r.findings_count,
+            "error_message": r.error_message,
+        }
+        for r in results
+    ])
+    evidence.add_evidence("gate_decision", {
+        "action": decision.action.value,
+        "reasons": decision.reasons,
+    })
+    evidence_path = evidence.save_chain()
+    evidence_hash = evidence.compute_hash()
+
     print(f"[*] Run ID: {decision.run_id}")
     print(f"[*] Gate Action Result: {decision.action.value}")
     for reason in decision.reasons:
         print(f"    - {reason}")
+    print(f"[*] Evidence saved to {evidence_path}")
+    print(f"[*] Evidence hash (sha256): {evidence_hash}")
+
+    # Machine-readable outputs for callers like GitHub Actions'
+    # workflow_call outputs (`steps.<id>.outputs.<name>`), which read from
+    # $GITHUB_OUTPUT rather than parsing this function's stdout log lines.
+    import os
+    github_output = os.environ.get("GITHUB_OUTPUT")
+    if github_output:
+        blocking_count = sum(r.findings_count for r in results)
+        with open(github_output, "a", encoding="utf-8") as f:
+            f.write(f"gate-result={decision.action.value}\n")
+            f.write(f"findings-count={blocking_count}\n")
+            f.write(f"evidence-hash={evidence_hash}\n")
 
     if decision.action == GateAction.BLOCK:
         print("[!] CI HARD GATE FAILED: Action is BLOCK.")
@@ -111,12 +159,18 @@ def main():
     parser.add_argument("--policy", default="gate_policy.yaml", help="Path to the gate policy YAML")
     parser.add_argument("--registry", default="rules/registry.yaml", help="Path to the rule registry YAML")
     parser.add_argument("--env", default="production", help="Gate policy environment")
+    parser.add_argument("--opa-policy-dir", default="policies", help="Path to the OPA policy directory (default: this repo's own policies/)")
+    parser.add_argument("--ruleset", default=None, help="Path to an external Spectral ruleset (.spectral.yaml); defaults to Spectral's own auto-discovery")
+    parser.add_argument("--evidence-dir", default="evidence_output", help="Directory to write the evidence chain JSON to")
     args = parser.parse_args()
     sys.exit(run_gate_check(
         spec_path=args.spec,
         policy_path=args.policy,
         registry_path=args.registry,
         environment=args.env,
+        opa_policy_dir=args.opa_policy_dir,
+        ruleset_path=args.ruleset,
+        evidence_dir=args.evidence_dir,
     ))
 
 

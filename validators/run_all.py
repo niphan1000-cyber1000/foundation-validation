@@ -159,16 +159,26 @@ def _parse_leading_json(text, tool_name):
     return value
 
 
-def _invoke_spectral(spec_path):
+def _invoke_spectral(spec_path, ruleset_path=None):
     """Run Spectral CLI against spec_path and return its raw JSON findings
     list. Raises RuntimeError (system error, not a silent []) if Spectral
-    can't be invoked at all."""
+    can't be invoked at all.
+
+    ruleset_path, when given, is passed through as `-r <path>` so callers
+    (e.g. the reusable gate workflow, validating a Studio spec against a
+    Foundation-owned .spectral.yaml) can point Spectral at a ruleset that
+    isn't this repo's own bundled .spectral.yaml. When omitted, Spectral
+    falls back to its normal auto-discovery behavior.
+    """
     npx = _resolve_executable("npx")
     if not npx:
         raise RuntimeError("npx not found on PATH â€” is Node.js installed?")
+    cmd = [npx, "--yes", "@stoplight/spectral-cli", "lint", str(spec_path), "-f", "json"]
+    if ruleset_path is not None:
+        cmd.extend(["-r", str(ruleset_path)])
     try:
         proc = subprocess.run(
-            [npx, "--yes", "@stoplight/spectral-cli", "lint", str(spec_path), "-f", "json"],
+            cmd,
             capture_output=True,
             text=True,
             timeout=120,
@@ -240,6 +250,7 @@ def run_all_validations(
     openapi_json_data=None,
     opa_json_data=None,
     policy_dir="policies",
+    ruleset_path=None,
     environment="production",
 ):
     """Aggregate the OpenAPI and Policy domains into a single
@@ -251,6 +262,11 @@ def run_all_validations(
     neither injected data nor a spec_path is given, both domains are
     SKIPPED and the result is an empty PASS â€” this is what lets
     run_all_validations() be called with no arguments in unit tests.
+
+    ruleset_path, when given, is forwarded to _invoke_spectral so the spec
+    is linted against an external ruleset (e.g. a Foundation repo's
+    .spectral.yaml) instead of this repo's own bundled one. Ignored when
+    openapi_json_data is injected directly.
     """
     registry = load_registry(registry_path)
     domains_status = {}
@@ -264,7 +280,7 @@ def run_all_validations(
         domains_status["openapi"] = "RUN"
     elif spec_path is not None:
         try:
-            raw = _invoke_spectral(spec_path)
+            raw = _invoke_spectral(spec_path, ruleset_path=ruleset_path)
             domains_status["openapi"] = "RUN"
         except RuntimeError as e:
             raw = []
@@ -411,6 +427,7 @@ def main():
     parser.add_argument("--output", help="Path to write the full ValidationResultContract JSON to")
     parser.add_argument("--registry", default="rules/registry.yaml", help="Path to rule registry YAML")
     parser.add_argument("--policies", default="policies", help="Path to the OPA policy directory")
+    parser.add_argument("--ruleset", default=None, help="Path to a Spectral ruleset (.spectral.yaml) to lint against; defaults to Spectral's own auto-discovery")
     parser.add_argument("--env", default="production", choices=sorted(GATE_POLICIES.keys()),
                          help="Gate policy environment (production = strict, dev = relaxed)")
     args = parser.parse_args()
@@ -425,6 +442,7 @@ def main():
         spec_path=spec_path,
         registry_path=args.registry,
         policy_dir=args.policies,
+        ruleset_path=args.ruleset,
         environment=args.env,
     )
 
