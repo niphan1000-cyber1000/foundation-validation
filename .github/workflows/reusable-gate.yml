@@ -4,7 +4,7 @@ name: Reusable Governance Gate
 #
 #   jobs:
 #     gate:
-#       uses: niphan1000-cyber1000/foundation-validation/.github/workflows/reusable-gate.yml@v1
+#       uses: niphan1000-cyber1000/foundation-validation/.github/workflows/reusable-gate.yml@main
 #       with:
 #         spec_path: openapi.yaml
 #       secrets:
@@ -13,12 +13,13 @@ name: Reusable Governance Gate
 # MVP scope (deliberately narrow, per the phased rollout plan):
 #   - Lints spec_path against the Foundation's OWN .spectral.yaml (SSOT),
 #     not this engine's bundled one.
-#   - Also runs the OPA/policy domain against the Foundation's policies/
-#     directory if one exists there; if it doesn't (true today — the
-#     Foundation repo currently only defines Spectral rules for API specs,
-#     no OPA rego), that domain is skipped automatically rather than
-#     erroring — this is existing behavior in validators/run_all.py, not
-#     new logic added for this workflow.
+#   - Runs the OPA/policy domain against Foundation policies/security/ only.
+#     Do NOT point at the whole policies/ tree: policies/naming/*.yaml is
+#     naming-convention config (not Rego) and breaks `opa eval` YAML parsing.
+#     If no usable .rego is present, the policy domain is skipped
+#     automatically (existing behavior in validators/run_all.py).
+#   - Installs Spectral CLI globally so CI does not rely on `npx` download
+#     (which frequently times out on GitHub-hosted runners).
 #   - Does not yet support multiple specs per call, custom gate_policy.yaml
 #     overrides from the Studio, or SARIF upload — those are follow-ups
 #     once this MVP is proven working end-to-end.
@@ -41,10 +42,10 @@ on:
         type: string
         default: "main"
       engine_ref:
-        description: "Git ref (tag) of this foundation-validation repo to check out and run. Pin this explicitly in callers; it is NOT inferred from the @ref used to call this workflow."
+        description: "Git ref (tag/branch) of this foundation-validation repo to check out and run. Pin this explicitly in callers; it is NOT inferred from the @ref used to call this workflow."
         required: false
         type: string
-        default: "v1"
+        default: "main"
       environment:
         description: "Gate policy environment (production = strict, dev = relaxed)."
         required: false
@@ -101,6 +102,12 @@ jobs:
         with:
           node-version: '20'
 
+      # Install Spectral globally so the engine does not have to `npx --yes`
+      # download @stoplight/spectral-cli on every run (that path timed out at
+      # 120s on GitHub-hosted runners). npx will reuse the global binary.
+      - name: Install Spectral CLI
+        run: npm install -g @stoplight/spectral-cli
+
       - name: Install OPA CLI
         run: |
           curl -L -o opa https://openpolicyagent.org/downloads/v0.55.0/opa_linux_amd64_static
@@ -115,10 +122,11 @@ jobs:
         id: run_gate
         working-directory: engine
         run: |
+          set -euo pipefail
           python -m src.cli \
             --spec "../${{ inputs.spec_path }}" \
             --policy gate_policy.yaml \
             --registry rules/registry.yaml \
             --ruleset "../foundation/.spectral.yaml" \
-            --opa-policy-dir "../foundation/policies" \
+            --opa-policy-dir "../foundation/policies/security" \
             --env "${{ inputs.environment }}"
