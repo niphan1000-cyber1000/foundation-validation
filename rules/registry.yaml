@@ -123,6 +123,186 @@ rules:
     introduced_version: "1.1.0"
     deprecated_version: null
 
+  # --- OPA/Rego rules (policies/governance.rego, policies/security.rego) ---
+  # These rule_ids come straight from each Rego rule's own "rule_id" field
+  # (see validators/policy/policy_engine.py), not from the OAS-/SEC-
+  # prefixing logic that applies to Spectral findings. They were never
+  # catalogued here, which meant every one of them fell through to the
+  # unregistered-rule fail-safe path in validators/run_all.py::_resolve_finding.
+
+  - rule_id: GOV-001-MISSING-GOVERNANCE-ID
+    domain: governance
+    version: "1.0.0"
+    severity: HIGH
+    title: "API spec must declare info.x-governance-id"
+    description: >
+      OpenAPI info object must include the custom "x-governance-id" field.
+    purpose: >
+      Links every governed API spec back to a tracked governance record.
+    requirement_id: null
+    implementation: "policies/governance.rego via validators/policy/ -> validators/run_all.py --spec"
+    evidence_type: "policy-eval-finding"
+    gate_behavior: FAIL
+    references: []
+    status: active
+    owner: unassigned
+    introduced_version: "1.2.0"
+    deprecated_version: null
+
+  - rule_id: GOV-001-MISSING-OWNER
+    domain: governance
+    version: "1.0.0"
+    severity: HIGH
+    title: "API spec must declare info.x-owner"
+    description: >
+      OpenAPI info object must include the custom "x-owner" field naming
+      the owning team.
+    purpose: >
+      Ensures every governed API has an accountable owner. This is the
+      OPA/Rego counterpart of Foundation's Spectral rule
+      "cloudforge-owner-metadata" (see the Foundation registry entry for
+      OAS-cloudforge-owner-metadata) — both enforce the same requirement
+      as a deliberate defense-in-depth pair, same as SEC-001/SEC-002.
+    requirement_id: null
+    implementation: "policies/governance.rego via validators/policy/ -> validators/run_all.py --spec"
+    evidence_type: "policy-eval-finding"
+    gate_behavior: FAIL
+    references: []
+    status: active
+    owner: unassigned
+    introduced_version: "1.2.0"
+    deprecated_version: null
+
+  - rule_id: GOV-001-MISSING-DOMAIN
+    domain: governance
+    version: "1.0.0"
+    severity: HIGH
+    title: "API spec must declare info.x-domain"
+    description: >
+      OpenAPI info object must include the custom "x-domain" field.
+    purpose: >
+      Classifies every governed API under a tracked business/platform
+      domain for ownership and reporting.
+    requirement_id: null
+    implementation: "policies/governance.rego via validators/policy/ -> validators/run_all.py --spec"
+    evidence_type: "policy-eval-finding"
+    gate_behavior: FAIL
+    references: []
+    status: active
+    owner: unassigned
+    introduced_version: "1.2.0"
+    deprecated_version: null
+
+  - rule_id: GOV-002-INVALID-SEMVER
+    domain: governance
+    version: "1.0.0"
+    severity: MEDIUM
+    title: "info.version must follow Semantic Versioning X.Y.Z"
+    description: >
+      OPA/Rego counterpart of Foundation's Spectral rule
+      "cloudforge-semver-version" (OAS-cloudforge-semver-version in the
+      Foundation registry) — defense-in-depth pair over the same
+      invariant.
+    purpose: >
+      Predictable, comparable version numbers across all governed APIs.
+    requirement_id: null
+    implementation: "policies/governance.rego via validators/policy/ -> validators/run_all.py --spec"
+    evidence_type: "policy-eval-finding"
+    gate_behavior: WARN
+    references: []
+    status: active
+    owner: unassigned
+    introduced_version: "1.2.0"
+    deprecated_version: null
+
+  - rule_id: GOV-003-MISSING-OPERATION-DESCRIPTION
+    domain: governance
+    version: "1.0.0"
+    severity: MEDIUM
+    title: "Every operation must have a description"
+    description: >
+      Every OpenAPI operation (excluding the "parameters" key) must
+      declare a non-empty "description" field.
+    purpose: >
+      Traceability and consumer-facing documentation quality.
+    requirement_id: null
+    implementation: "policies/governance.rego via validators/policy/ -> validators/run_all.py --spec"
+    evidence_type: "policy-eval-finding"
+    gate_behavior: WARN
+    references: []
+    status: active
+    owner: unassigned
+    introduced_version: "1.2.0"
+    deprecated_version: null
+
+  - rule_id: GOV-003-MISSING-OPERATION-TAGS
+    domain: governance
+    version: "1.0.0"
+    severity: MEDIUM
+    title: "Every operation must declare at least one tag"
+    description: >
+      Every OpenAPI operation (excluding the "parameters" key) must
+      declare at least one entry in "tags".
+    purpose: >
+      Traceability and consistent API-catalog grouping.
+    requirement_id: null
+    implementation: "policies/governance.rego via validators/policy/ -> validators/run_all.py --spec"
+    evidence_type: "policy-eval-finding"
+    gate_behavior: WARN
+    references: []
+    status: active
+    owner: unassigned
+    introduced_version: "1.2.0"
+    deprecated_version: null
+
+  - rule_id: SEC-001-MISSING-SECURITY
+    domain: security
+    version: "1.0.0"
+    severity: HIGH
+    title: "API spec must define global or per-operation security"
+    description: >
+      Either a global "security" requirement, or a "security" entry on
+      every individual operation, must be present.
+    purpose: >
+      Prevents an API from shipping with no authentication/authorization
+      requirement declared at all — an undeclared-security spec is not
+      the same finding as an insecure-transport spec (see
+      SEC-001-https-only), hence the distinct rule_id despite the shared
+      "SEC-001" numbering across the Spectral and Rego rule sets.
+    requirement_id: null
+    implementation: "policies/security.rego via validators/policy/ -> validators/run_all.py --spec"
+    evidence_type: "policy-eval-finding"
+    gate_behavior: FAIL
+    references: []
+    status: active
+    owner: unassigned
+    introduced_version: "1.2.0"
+    deprecated_version: null
+
+  - rule_id: SEC-003-SENSITIVE-QUERY-PARAM
+    domain: security
+    version: "1.0.0"
+    severity: CRITICAL
+    title: "Sensitive terms must not appear in query parameter names"
+    description: >
+      Query parameters named with tokens/passwords/secrets/API keys are
+      forbidden, since query strings routinely end up in logs, browser
+      history, and referrer headers. OPA/Rego counterpart of Foundation's
+      Spectral rule "cloudforge-no-sensitive-query-params"
+      (OAS-cloudforge-no-sensitive-query-params in the Foundation
+      registry) — defense-in-depth pair.
+    purpose: >
+      Prevents credential/token leakage via query strings.
+    requirement_id: null
+    implementation: "policies/security.rego via validators/policy/ -> validators/run_all.py --spec"
+    evidence_type: "policy-eval-finding"
+    gate_behavior: FAIL
+    references: []
+    status: active
+    owner: unassigned
+    introduced_version: "1.2.0"
+    deprecated_version: null
+
   - rule_id: SEC-002-NON-HTTPS-SERVER
     domain: security
     version: "1.1.0"

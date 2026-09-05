@@ -72,25 +72,57 @@ GATE_POLICIES = {
 
 
 def load_registry(registry_path="rules/registry.yaml"):
-    """Load rules/registry.yaml into {rule_id: rule_dict}. Returns {} if the
-    file is missing (fail-safe defaults then apply to every finding)."""
+    """Load one or more rule registries into a single {rule_id: rule_dict}
+    map. `registry_path` may be a single path or a comma-separated list of
+    paths (e.g. "rules/registry.yaml,../foundation/rules/registry.yaml"),
+    so a Studio gate can merge this engine's own bundled registry with an
+    external SSOT registry (e.g. Foundation's) that documents rule_ids
+    from a ruleset/policy-dir this engine doesn't own.
+
+    Paths are loaded in order and merged; a rule_id defined in a later
+    path overrides the same rule_id from an earlier path, so callers
+    should list the more-authoritative registry last (Foundation's, for
+    an external SSOT, after this engine's own).
+
+    A missing file is not a hard error (a Studio may not have an external
+    registry yet) but IS logged to stderr, since a silently-missing
+    registry is exactly what caused every finding to fall through to the
+    fail-safe default in the past — that fallback should be a visible,
+    logged event, not a silent one.
+
+    Returns {} only if no path resolves to any rules at all (fail-safe
+    severity-based defaults then apply to every finding; see
+    _resolve_finding)."""
     if not yaml:
         return {}
-    path = Path(registry_path)
-    if not path.exists():
-        return {}
-    with open(path, "r", encoding="utf-8-sig") as f:
-        data = yaml.safe_load(f) or {}
     rules = {}
-    for rule in data.get("rules", []):
-        rules[rule.get("rule_id") or rule.get("id")] = rule
+    paths = [p.strip() for p in str(registry_path).split(",") if p.strip()]
+    for raw_path in paths:
+        path = Path(raw_path)
+        if not path.exists():
+            print(f"WARNING: registry file not found, skipping: {path}", file=sys.stderr)
+            continue
+        with open(path, "r", encoding="utf-8-sig") as f:
+            data = yaml.safe_load(f) or {}
+        for rule in data.get("rules", []):
+            rules[rule.get("rule_id") or rule.get("id")] = rule
     return rules
 
 
 def _resolve_finding(finding, registry, environment):
     """Attach severity/gate_behavior/effective_gate_behavior to a raw
     finding, using the registry as the source of truth when the rule is
-    catalogued and a fail-safe severity-based default otherwise."""
+    catalogued and a fail-safe severity-based default otherwise.
+
+    The fail-safe default for an unregistered rule_id must still respect
+    the severity the underlying tool (Spectral/OPA) itself reported,
+    via _DEFAULT_GATE_BEHAVIOR_BY_SEVERITY — NOT a blanket CRITICAL/FAIL.
+    A ruleset can carry many rules (e.g. the ~100 built-in spectral:oas
+    rules) that will never all be individually catalogued in a registry;
+    treating every one of those as CRITICAL/BLOCK the moment a Studio
+    lints against a ruleset with a different naming scheme than this
+    registry defeats the purpose of severity entirely and makes the gate
+    behavior indistinguishable from "always BLOCK"."""
     rule_id = finding.get("rule_id", "")
     rule_meta = registry.get(rule_id)
 
@@ -99,9 +131,13 @@ def _resolve_finding(finding, registry, environment):
         gate_behavior = str(rule_meta.get("gate_behavior", "FAIL")).upper()
         finding["rule_version"] = rule_meta.get("version", "0.0.0")
     else:
-        # FIX: Fail-safe default for unknown/unregistered rules (Block by default)
-        severity = "CRITICAL"
-        gate_behavior = "FAIL"
+        # Fail-safe default for unknown/unregistered rules: trust the
+        # tool's own reported severity and derive gate_behavior from it,
+        # same as a catalogued rule would be treated at that severity.
+        severity = str(finding.get("severity", "MEDIUM")).upper()
+        if severity not in _DEFAULT_GATE_BEHAVIOR_BY_SEVERITY:
+            severity = "MEDIUM"
+        gate_behavior = _DEFAULT_GATE_BEHAVIOR_BY_SEVERITY[severity]
         finding["rule_version"] = "unknown"
 
     policy = GATE_POLICIES.get(environment, GATE_POLICIES["production"])
@@ -425,7 +461,7 @@ def main():
     parser.add_argument("--spec", required=True, help="Path to the OpenAPI spec file to validate")
     parser.add_argument("--sarif", help="Path to write a SARIF report to")
     parser.add_argument("--output", help="Path to write the full ValidationResultContract JSON to")
-    parser.add_argument("--registry", default="rules/registry.yaml", help="Path to rule registry YAML")
+    parser.add_argument("--registry", default="rules/registry.yaml", help="Path to rule registry YAML, or a comma-separated list of registry YAML paths to merge (later paths win on rule_id conflicts)")
     parser.add_argument("--policies", default="policies", help="Path to the OPA policy directory")
     parser.add_argument("--ruleset", default=None, help="Path to a Spectral ruleset (.spectral.yaml) to lint against; defaults to Spectral's own auto-discovery")
     parser.add_argument("--env", default="production", choices=sorted(GATE_POLICIES.keys()),
