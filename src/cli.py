@@ -157,7 +157,7 @@ def main():
     parser = argparse.ArgumentParser(description="Foundation Validation Engine — CI gate check")
     parser.add_argument("--spec", default="openapi.yaml", help="Path to the OpenAPI spec to validate")
     parser.add_argument("--policy", default="gate_policy.yaml", help="Path to the gate policy YAML")
-    parser.add_argument("--registry", default="rules/registry.yaml", help="Path to the rule registry YAML")
+    parser.add_argument("--registry", default="rules/registry.yaml", help="Path to the rule registry YAML, or a comma-separated list of registry YAML paths to merge (later paths win on rule_id conflicts)")
     parser.add_argument("--env", default="production", help="Gate policy environment")
     parser.add_argument("--opa-policy-dir", default="policies", help="Path to the OPA policy directory (default: this repo's own policies/)")
     parser.add_argument("--ruleset", default=None, help="Path to an external Spectral ruleset (.spectral.yaml); defaults to Spectral's own auto-discovery")
