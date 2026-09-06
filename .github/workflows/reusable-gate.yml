@@ -126,7 +126,6 @@ jobs:
           python -m src.cli \
             --spec "../${{ inputs.spec_path }}" \
             --policy gate_policy.yaml \
-            --registry rules/registry.yaml \
+            --registry "rules/registry.yaml,../foundation/rules/registry.yaml" \
             --ruleset "../foundation/.spectral.yaml" \
-            --opa-policy-dir "../foundation/policies/security" \
             --env "${{ inputs.environment }}"
