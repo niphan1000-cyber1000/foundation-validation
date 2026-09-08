@@ -21,7 +21,7 @@ import yaml
 
 from src.core.models import ValidatorResult, ValidationState, GateAction
 from src.core.engine import GateDecisionEngine
-from src.core.evidence import EvidenceCollector
+from src.core.evidence import EvidenceCollector, hash_paths, hash_file, hash_directory
 
 # validators/run_all.py is a standalone module (not a package import path),
 # so it needs its directory on sys.path the same way validators/run_all.py
@@ -62,6 +62,7 @@ def run_gate_check(
     opa_policy_dir: str = "policies",
     ruleset_path: str = None,
     evidence_dir: str = "evidence_output",
+    foundation_sha: str = None,
 ) -> int:
     print(f"[*] Loading gate policy from {policy_path}...")
     try:
@@ -105,9 +106,22 @@ def run_gate_check(
     evidence = EvidenceCollector(run_id=decision.run_id, output_dir=evidence_dir)
     evidence.add_evidence("inputs", {
         "spec_path": str(spec_path),
+        "spec_hash": hash_file(spec_path),
         "registry_path": str(registry_path),
+        # Content hash per registry path, not just the path string — a
+        # path proves nothing once the checkout that produced it is gone;
+        # this is what a reviewer actually verifies the decision against.
+        "registry_hashes": hash_paths(registry_path),
         "opa_policy_dir": str(opa_policy_dir),
+        "opa_policy_dir_hash": hash_directory(opa_policy_dir),
         "ruleset_path": str(ruleset_path) if ruleset_path else None,
+        "ruleset_hash": hash_file(ruleset_path) if ruleset_path else None,
+        # Commit SHA of the Foundation checkout this run validated against
+        # (passed in by the caller, e.g. reusable-gate.yml's "Checkout
+        # Foundation" step) — ties the decision to an exact, re-checkoutable
+        # point in Foundation's history, not just "whatever main was at
+        # checkout time."
+        "foundation_commit_sha": foundation_sha,
         "environment": environment,
     })
     evidence.add_evidence("domain_results", [
@@ -162,6 +176,7 @@ def main():
     parser.add_argument("--opa-policy-dir", default="policies", help="Path to the OPA policy directory (default: this repo's own policies/)")
     parser.add_argument("--ruleset", default=None, help="Path to an external Spectral ruleset (.spectral.yaml); defaults to Spectral's own auto-discovery")
     parser.add_argument("--evidence-dir", default="evidence_output", help="Directory to write the evidence chain JSON to")
+    parser.add_argument("--foundation-sha", default=None, help="Commit SHA of the checked-out Foundation repo this run validated against, recorded into the evidence chain for traceability")
     args = parser.parse_args()
     sys.exit(run_gate_check(
         spec_path=args.spec,
@@ -171,6 +186,7 @@ def main():
         opa_policy_dir=args.opa_policy_dir,
         ruleset_path=args.ruleset,
         evidence_dir=args.evidence_dir,
+        foundation_sha=args.foundation_sha,
     ))
 
 
