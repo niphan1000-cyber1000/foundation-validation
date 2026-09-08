@@ -86,6 +86,7 @@ def run_gate_check(
     findings = validation_result["findings"]
 
     results = []
+    domain_findings = {}
     for validator_name, category in _DOMAINS:
         status = domains.get(category, "SKIPPED")
         state, count, error_message = _domain_result(status, findings, category, system_errors)
@@ -95,6 +96,23 @@ def run_gate_check(
             findings_count=count,
             error_message=error_message,
         ))
+        # Keep every finding for this domain (not just the blocking ones)
+        # so the evidence chain can answer "what exactly did opa/spectral
+        # find" without anyone having to re-run the gate — a raw pass/fail
+        # count alone (the previous evidence shape) told you a domain
+        # BLOCKed but nothing about which rule_id(s) caused it.
+        domain_findings[validator_name] = [
+            {
+                "rule_id": f.get("rule_id"),
+                "message": f.get("message"),
+                "severity": f.get("severity"),
+                "gate_behavior": f.get("gate_behavior"),
+                "effective_gate_behavior": f.get("effective_gate_behavior"),
+                "rule_version": f.get("rule_version"),
+            }
+            for f in findings
+            if f.get("category") == category
+        ]
 
     engine = GateDecisionEngine(policy_data)
     decision = engine.evaluate(run_id=validation_result["execution"]["execution_id"], results=results)
@@ -130,6 +148,7 @@ def run_gate_check(
             "state": r.state.value,
             "findings_count": r.findings_count,
             "error_message": r.error_message,
+            "findings": domain_findings.get(r.validator_name, []),
         }
         for r in results
     ])
