@@ -85,6 +85,17 @@ jobs:
           path: foundation
           token: ${{ secrets.foundation_pat }}
 
+      - name: Record Foundation commit SHA
+        id: foundation_meta
+        run: echo "sha=$(git -C foundation rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        # Ties the evidence chain to an exact, re-checkoutable point in
+        # Foundation's history (inputs.foundation_ref is a branch name
+        # like "main", which moves — the commit SHA doesn't). Without
+        # this, "what ruleset/policy version actually backed this
+        # decision" could only ever be answered as "whatever main was at
+        # some point," which isn't independently verifiable after the
+        # fact.
+
       - name: Checkout foundation-validation engine
         uses: actions/checkout@v4
         with:
@@ -128,4 +139,22 @@ jobs:
             --policy gate_policy.yaml \
             --registry "rules/registry.yaml,../foundation/rules/registry.yaml" \
             --ruleset "../foundation/.spectral.yaml" \
+            --foundation-sha "${{ steps.foundation_meta.outputs.sha }}" \
             --env "${{ inputs.environment }}"
+
+      - name: Upload evidence chain
+        if: always()
+        # if: always() is the whole point of this step: evidence_output/
+        # only existed inside this ephemeral runner's filesystem and was
+        # discarded the moment the job ended, on both success AND failure
+        # — so a BLOCKed run's evidence (arguably the case you most want
+        # to keep, to know exactly what tripped the gate) was just as
+        # unrecoverable as an ALLOWed one. Without `always()`, a failed
+        # "Run Governance Gate" step would skip this upload entirely by
+        # GitHub Actions' default step-skip-after-failure behavior.
+        uses: actions/upload-artifact@v4
+        with:
+          name: governance-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: engine/evidence_output/
+          retention-days: 90
+          if-no-files-found: warn
