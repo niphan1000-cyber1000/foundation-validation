@@ -41,13 +41,15 @@ except ImportError:
     yaml = None
 
 BASE_DIR = Path(__file__).resolve().parent
-for sub in ("openapi", "policy"):
+for sub in ("openapi", "policy", "schema", "traceability"):
     p = str(BASE_DIR / sub)
     if p not in sys.path:
         sys.path.insert(0, p)
 
 from openapi_engine import parse_spectral_output, SpectralOutputError  # noqa: E402
 from policy_engine import parse_opa_output  # noqa: E402
+from schema_engine import validate as _validate_schema  # noqa: E402
+from traceability_engine import check_traceability as _check_traceability  # noqa: E402
 
 PLATFORM_VERSION = "1.0.0"
 
@@ -107,6 +109,103 @@ def load_registry(registry_path="rules/registry.yaml"):
         for rule in data.get("rules", []):
             rules[rule.get("rule_id") or rule.get("id")] = rule
     return rules
+
+
+def load_requirements(requirements_path="rules/requirements.json"):
+    """Load the requirement catalogue used by the traceability domain into
+    a {requirement_id: requirement_dict} map.
+
+    Mirrors load_registry()'s fail-safe philosophy: a missing catalogue
+    file is not a hard error (most repos won't have adopted one yet) but
+    IS logged to stderr, and returns {} â€” which check_traceability()
+    treats as "no catalogue exists", never as "everything is covered".
+    """
+    path = Path(requirements_path)
+    if not path.exists():
+        print(f"WARNING: requirement catalogue not found, skipping: {path}", file=sys.stderr)
+        return {}
+    with open(path, "r", encoding="utf-8-sig") as f:
+        data = json.load(f) or {}
+    return {r.get("requirement_id"): r for r in data.get("requirements", [])}
+
+
+# Maps a schema_engine.SchemaError's `keyword` to the SCH- rule_id it
+# corresponds to, per validators/schema/README.md's severity table.
+# Duplicated (not imported) from validators/schema/run.py: that module's
+# copy is the CLI-facing one, this is the aggregator-facing one, and
+# keeping this a plain literal here avoids run_all.py depending on
+# schema/run.py's argparse-oriented module just to reuse one dict.
+_SCHEMA_KEYWORD_TO_RULE = {
+    "required": "SCH-001",
+    "type": "SCH-002",
+    "enum": "SCH-002",
+    "const": "SCH-002",
+    "pattern": "SCH-003",
+    "format": "SCH-003",
+    "minLength": "SCH-003",
+    "minimum": "SCH-003",
+    "minItems": "SCH-003",
+    "uniqueItems": "SCH-003",
+    "additionalProperties": "SCH-004",
+    "oneOf": "SCH-005",
+    "allOf": "SCH-005",
+}
+
+
+def _load_schema_rule_severities():
+    """Reads validators/schema/rules.json for SCH- rule severities, so
+    schema-domain findings carry the same severity the schema/ folder's
+    own CLI (run.py) would report, instead of a hardcoded guess here."""
+    path = BASE_DIR / "schema" / "rules.json"
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            rules = json.load(f)
+        return {r["rule_id"]: r.get("severity", "MEDIUM") for r in rules}
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _run_schema_check(schema_path, target_path):
+    """Validate target_path against schema_path using the stdlib-only
+    engine in validators/schema/schema_engine.py, and return findings in
+    the same unified shape openapi_engine/policy_engine produce (so
+    run_all_validations can merge them into one findings list untouched).
+
+    Raises on any load/validate problem (missing file, bad JSON/YAML, or
+    a schema keyword schema_engine.py doesn't support) rather than
+    swallowing it â€” same fail-safe rule as every other domain in this
+    file: a check that couldn't actually run is a system ERROR, never a
+    silent pass.
+    """
+    schema_path = Path(schema_path)
+    target_path = Path(target_path)
+
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    text = target_path.read_text(encoding="utf-8")
+    if target_path.suffix in (".yaml", ".yml"):
+        if not yaml:
+            raise RuntimeError("PyYAML is required to validate a YAML target but is not installed")
+        instance = yaml.safe_load(text)
+    else:
+        instance = json.loads(text)
+
+    errors = _validate_schema(instance, schema)
+    severities = _load_schema_rule_severities()
+    findings = []
+    for err in errors:
+        rule_id = _SCHEMA_KEYWORD_TO_RULE.get(err.keyword, "SCH-003")
+        findings.append({
+            "rule_id": rule_id,
+            "severity": severities.get(rule_id, "MEDIUM"),
+            "category": "schema",
+            "message": f"[{err.keyword}] at {err.path}: {err.message}",
+            "location": {
+                "file": str(target_path),
+                "path": err.path,
+                "line": 0,
+            },
+        })
+    return findings
 
 
 def _resolve_finding(finding, registry, environment):
@@ -288,21 +387,45 @@ def run_all_validations(
     policy_dir="policies",
     ruleset_path=None,
     environment="production",
+    schema_checks=None,
+    schema_json_data=None,
+    enable_traceability=False,
+    requirements_path="rules/requirements.json",
+    traceability_json_data=None,
 ):
-    """Aggregate the OpenAPI and Policy domains into a single
-    ValidationResultContract-shaped dict.
+    """Aggregate the OpenAPI, Policy, Schema, and Traceability domains
+    into a single ValidationResultContract-shaped dict.
 
-    openapi_json_data / opa_json_data let callers (tests, or the CLI after
-    it has already shelled out to spectral/opa) inject already-fetched raw
-    tool output instead of this function invoking the tools itself. When
-    neither injected data nor a spec_path is given, both domains are
-    SKIPPED and the result is an empty PASS â€” this is what lets
+    openapi_json_data / opa_json_data / schema_json_data /
+    traceability_json_data let callers (tests, or the CLI after it has
+    already produced raw domain output itself) inject already-computed
+    findings instead of this function invoking the underlying tool/engine
+    itself. When none of the four domains has either injected data or the
+    input it needs to run (spec_path for openapi/policy, schema_checks for
+    schema, enable_traceability=True for traceability), that domain is
+    SKIPPED â€” with an empty spec_path/schema_checks and
+    enable_traceability=False this is an empty PASS, which is what lets
     run_all_validations() be called with no arguments in unit tests.
 
     ruleset_path, when given, is forwarded to _invoke_spectral so the spec
     is linted against an external ruleset (e.g. a Foundation repo's
     .spectral.yaml) instead of this repo's own bundled one. Ignored when
     openapi_json_data is injected directly.
+
+    schema_checks, when given, is a list of {"schema": path, "target":
+    path} dicts; each pair is validated via validators/schema's engine and
+    the resulting findings merged in. This domain is unlike the others in
+    that it has no single natural "target" (see validators/schema/README.md)
+    so it's opt-in per invocation rather than tied to spec_path.
+
+    enable_traceability, when True, runs the traceability domain against
+    the already-loaded rule registry and the requirement catalogue at
+    requirements_path. It defaults to False: as of registry v1.2.0 every
+    rule's requirement_id is null, so turning this on will immediately
+    surface a TRC-001 HIGH finding (and therefore a FAILED gate in
+    production) for every currently active FAIL-gated rule â€” a real,
+    pre-existing gap, not a bug, but one this function won't spring on a
+    caller who hasn't opted in. See traceability_engine.py.
     """
     registry = load_registry(registry_path)
     domains_status = {}
@@ -372,6 +495,58 @@ def run_all_validations(
             "domain": "policy",
             "target_file": str(spec_path or "injected"),
             "rule_count": len(policy_findings),
+        })
+
+    # --- Schema domain ---
+    schema_findings = []
+    if schema_json_data is not None:
+        schema_findings = schema_json_data
+        domains_status["schema"] = "RUN"
+    elif schema_checks:
+        try:
+            for check in schema_checks:
+                schema_findings.extend(_run_schema_check(check["schema"], check["target"]))
+            domains_status["schema"] = "RUN"
+        except Exception as e:
+            schema_findings = []
+            domains_status["schema"] = "ERROR"
+            system_errors.append(f"schema: {e}")
+    else:
+        domains_status["schema"] = "SKIPPED"
+
+    if domains_status["schema"] == "RUN":
+        findings.extend(schema_findings)
+        artifacts.append({
+            "domain": "schema",
+            "target_file": ",".join(str(c.get("target")) for c in (schema_checks or [])) or "injected",
+            "rule_count": len(schema_findings),
+        })
+
+    # --- Traceability domain ---
+    # This domain checks the registry/catalogue, not spec_path, so it
+    # runs at most once per call regardless of spec_path being set.
+    traceability_findings = []
+    if traceability_json_data is not None:
+        traceability_findings = traceability_json_data
+        domains_status["traceability"] = "RUN"
+    elif enable_traceability:
+        try:
+            requirements = load_requirements(requirements_path)
+            traceability_findings = _check_traceability(registry, requirements)
+            domains_status["traceability"] = "RUN"
+        except Exception as e:
+            traceability_findings = []
+            domains_status["traceability"] = "ERROR"
+            system_errors.append(f"traceability: {e}")
+    else:
+        domains_status["traceability"] = "SKIPPED"
+
+    if domains_status["traceability"] == "RUN":
+        findings.extend(traceability_findings)
+        artifacts.append({
+            "domain": "traceability",
+            "target_file": str(requirements_path),
+            "rule_count": len(traceability_findings),
         })
 
     # --- Resolve every finding against the registry + gate policy ---
@@ -466,12 +641,34 @@ def main():
     parser.add_argument("--ruleset", default=None, help="Path to a Spectral ruleset (.spectral.yaml) to lint against; defaults to Spectral's own auto-discovery")
     parser.add_argument("--env", default="production", choices=sorted(GATE_POLICIES.keys()),
                          help="Gate policy environment (production = strict, dev = relaxed)")
+    parser.add_argument("--schema-check", action="append", default=None, metavar="SCHEMA=TARGET",
+                         help="Run the schema domain (SCH- rules) against SCHEMA=TARGET "
+                              "(repeatable, e.g. --schema-check schemas/validation-result.schema.json=evidence/audit_evidence.json). "
+                              "Uses '=' rather than ':' as the separator so Windows drive-letter paths aren't ambiguous. "
+                              "Omit to skip the schema domain (its default).")
+    parser.add_argument("--check-traceability", action="store_true",
+                         help="Run the traceability domain (TRC- rules) against --registry and "
+                              "--requirements. Off by default: no rule in this repo's registry has "
+                              "a requirement_id mapped yet, so enabling this will surface new HIGH "
+                              "findings for every active FAIL-gated rule. See traceability_engine.py.")
+    parser.add_argument("--requirements", default="rules/requirements.json",
+                         help="Path to the requirement catalogue JSON used by the traceability domain")
     args = parser.parse_args()
 
     spec_path = Path(args.spec)
     if not spec_path.exists():
         print(f"ERROR: spec file not found: {spec_path}", file=sys.stderr)
         sys.exit(2)
+
+    schema_checks = None
+    if args.schema_check:
+        schema_checks = []
+        for raw in args.schema_check:
+            if "=" not in raw:
+                print(f"ERROR: --schema-check must be SCHEMA=TARGET, got: {raw!r}", file=sys.stderr)
+                sys.exit(2)
+            schema_path, target_path = raw.split("=", 1)
+            schema_checks.append({"schema": schema_path, "target": target_path})
 
     registry = load_registry(args.registry)
     result = run_all_validations(
@@ -480,6 +677,9 @@ def main():
         policy_dir=args.policies,
         ruleset_path=args.ruleset,
         environment=args.env,
+        schema_checks=schema_checks,
+        enable_traceability=args.check_traceability,
+        requirements_path=args.requirements,
     )
 
     print(json.dumps(result, indent=2))

@@ -1,0 +1,5 @@
+{
+  "version": "0.1.0",
+  "description": "Requirement catalogue for the traceability domain (TRC- rules). Each entry a rule can point to via rules/registry.yaml's requirement_id field. See validators/traceability/README.md and traceability_engine.py for how this is consumed.",
+  "requirements": []
+}
