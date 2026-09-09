@@ -36,8 +36,13 @@ Regardless of domain, a validator MUST:
 
 | Domain | Status |
 |---|---|
-| `schema/` | **Implemented** — see [`schema/README.md`](./schema/README.md). Stdlib-only JSON Schema engine, `SCH-001`..`SCH-005` rules, CLI + test suite. |
-| `openapi/`, `security/`, `policy/`, `governance/`, `traceability/` | Scaffolding only — `README.md` describes intended scope, no implementation yet. |
+| `openapi/` | **Implemented + wired into `run_all.py`.** Always runs when `--spec` is given. |
+| `policy/` | **Implemented + wired into `run_all.py`.** Always runs when `--spec` is given (skipped if `policies/` doesn't exist). |
+| `schema/` | **Implemented + wired into `run_all.py`.** See [`schema/README.md`](./schema/README.md) for the engine itself. Opt-in per invocation via `--schema-check SCHEMA=TARGET` (repeatable) — this domain has no single natural target the way `--spec` gives openapi/policy one, so it defaults to `SKIPPED` unless you ask for a specific schema/target pair. |
+| `traceability/` | **Implemented + wired into `run_all.py`.** See [`traceability/README.md`](./traceability/README.md) for the engine. Opt-in via `--check-traceability`, off by default: every rule in `rules/registry.yaml` currently has `requirement_id: null`, so turning this on immediately surfaces a `TRC-001` HIGH finding for every active FAIL-gated rule — a real, pre-existing gap, not a bug, but one you should turn on deliberately rather than have it silently break a green gate. |
+| `security/`, `governance/` | Scaffolding only — `README.md` describes intended scope, no dedicated wrapper implementation yet. Some `SEC-`/`GOV-` rules are already enforced today through the `openapi/`+`policy/` domains (see `.spectral.yaml` and `policies/*.rego`); a standalone `validators/security/` / `validators/governance/` engine would let those rules run outside of a Spectral/OPA invocation. |
+
+All four wired domains report their state (`RUN` / `SKIPPED` / `ERROR` / `NOT_APPLICABLE`) in every result's `execution.domains` — a domain that didn't run is always visible there, never silently absent.
 
 Existing OPA policies in the top-level `security/` folder (distinct from
 `validators/security/` — see that folder's README for the naming note)

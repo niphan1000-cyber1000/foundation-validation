@@ -1,0 +1,34 @@
+[
+  {
+    "rule_id": "TRC-001",
+    "domain": "traceability",
+    "severity": "HIGH",
+    "description": "Mandatory rule (status=active, gate_behavior=FAIL) has coverage_status NOT_COVERED",
+    "requirement_id": null,
+    "version": "0.1.0"
+  },
+  {
+    "rule_id": "TRC-002",
+    "domain": "traceability",
+    "severity": "MEDIUM",
+    "description": "Mandatory rule has coverage_status PARTIAL without a documented coverage_reason",
+    "requirement_id": null,
+    "version": "0.1.0"
+  },
+  {
+    "rule_id": "TRC-003",
+    "domain": "traceability",
+    "severity": "MEDIUM",
+    "description": "Rule references a requirement_id that does not exist in the requirement catalogue",
+    "requirement_id": null,
+    "version": "0.1.0"
+  },
+  {
+    "rule_id": "TRC-004",
+    "domain": "traceability",
+    "severity": "LOW",
+    "description": "Requirement marked mandatory in the catalogue has no rule mapped to it",
+    "requirement_id": null,
+    "version": "0.1.0"
+  }
+]
