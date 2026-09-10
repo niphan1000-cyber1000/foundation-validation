@@ -1,4 +1,5 @@
-﻿"""
+﻿from validators.security.security_engine import run_security_scan
+"""
 run_all.py â€” Foundation Validation Engine master gate.
 
 Aggregates findings from the OpenAPI (Spectral) and Policy (OPA) domains,
@@ -50,9 +51,9 @@ from openapi_engine import parse_spectral_output, SpectralOutputError  # noqa: E
 from policy_engine import parse_opa_output, PolicyOutputError  # noqa: E402
 from schema_engine import validate as _validate_schema  # noqa: E402
 from traceability_engine import check_traceability as _check_traceability  # noqa: E402
-from security.security_engine import run_security_scan as _scan_security
-from governance.governance_engine import run_governance_scan as _scan_governance
-from governance.governance_engine import run_governance_scan as _scan_governance  # noqa: E402
+from validators.security.security_engine import run_security_scan as _scan_security
+from validators.governance.governance_engine import run_governance_scan as _scan_governance
+from validators.governance.governance_engine import run_governance_scan as _scan_governance  # noqa: E402
 
 PLATFORM_VERSION = "1.0.0"
 
@@ -225,7 +226,7 @@ def _resolve_finding(finding, registry, environment):
     lints against a ruleset with a different naming scheme than this
     registry defeats the purpose of severity entirely and makes the gate
     behavior indistinguishable from "always BLOCK"."""
-    rule_id = finding.get("rule_id", "")
+    rule_id = finding.get("rule_id", "") if isinstance(finding, dict) else str(finding)
     rule_meta = registry.get(rule_id)
 
     if rule_meta:
@@ -236,7 +237,7 @@ def _resolve_finding(finding, registry, environment):
         # Fail-safe default for unknown/unregistered rules: trust the
         # tool's own reported severity and derive gate_behavior from it,
         # same as a catalogued rule would be treated at that severity.
-        severity = str(finding.get("severity", "MEDIUM")).upper()
+        severity = str(finding.get("severity", "MEDIUM") if isinstance(finding, dict) else "MEDIUM").upper()
         if severity not in _DEFAULT_GATE_BEHAVIOR_BY_SEVERITY:
             severity = "MEDIUM"
         gate_behavior = _DEFAULT_GATE_BEHAVIOR_BY_SEVERITY[severity]
@@ -611,7 +612,7 @@ def run_all_validations(
         })
 
     # --- Resolve every finding against the registry + gate policy ---
-    findings = [_resolve_finding(f, registry, environment) for f in findings]
+    findings = [_resolve_finding({"message": f} if isinstance(f, str) else f, registry, environment) for f in findings]
 
     summary = {"total_findings": len(findings), "critical": 0, "high": 0, "medium": 0, "low": 0}
     has_blocking = False
@@ -765,6 +766,9 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
 
 
 
