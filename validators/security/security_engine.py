@@ -1,29 +1,41 @@
-﻿import os
+﻿import re
+import yaml
+from pathlib import Path
 
-def run_security_scan(target_path: str) -> list:
+def run_security_scan(target_file: str) -> dict:
     findings = []
-    keywords = ['api_key', 'apikey', 'secret', 'password', 'bearer']
-    
-    target = target_path if os.path.exists(target_path) else '.'
-    for root, dirs, files in os.walk(target):
-        # ข้ามฟลเดอร validators/security และ venv, .git ออกจากการสแกน
-        dirs[:] = [d for d in dirs if not d.startswith('.') and d != 'venv' and 'security' not in d]
-        for file in files:
-            if file.endswith(('.py', '.yaml', '.yml', '.json', '.env', '.md')):
-                file_path = os.path.join(root, file)
-                try:
-                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                        for line_idx, line in enumerate(f, start=1):
-                            lower_line = line.lower()
-                            for kw in keywords:
-                                if kw in lower_line and ('=' in line or ':' in line):
-                                    findings.append({
-                                        "rule_id": "SEC-001",
-                                        "severity": "HIGH",
-                                        "message": f"Potential secret keyword '{kw}' found in {file_path}:{line_idx}",
-                                        "file": file_path,
-                                        "line": line_idx
-                                    })
-                except Exception:
-                    pass
-    return findings
+    path = Path(target_file)
+    if not path.exists():
+        return {"status": "ERROR", "message": f"File not found: {target_file}", "findings": []}
+
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            data = yaml.safe_load(content) or {}
+    except Exception as e:
+        return {"status": "ERROR", "message": str(e), "findings": []}
+
+    # ตัวอย่างการตรวจสอบรปแบบความเสี่ยงเบื้องต้น (เช่น Secret patterns)
+    secret_patterns = [
+        r"api[_-]?key\s*[:=]\s*['\"].*?['\"]",
+        r"password\s*[:=]\s*['\"].*?['\"]",
+        r"secret\s*[:=]\s*['\"].*?['\"]"
+    ]
+
+    for idx, line in enumerate(content.splitlines(), start=1):
+        for pattern in secret_patterns:
+            if re.search(pattern, line, re.IGNORECASE):
+                findings.append({
+                    "rule_id": "SEC-001",
+                    "severity": "CRITICAL",
+                    "message": f"Potential hardcoded secret or credential found at line {idx}.",
+                    "file": target_file,
+                    "line": idx
+                })
+
+    return {
+        "domain": "security",
+        "status": "FAIL" if findings else "PASS",
+        "findings": findings,
+        "rule_count": len(findings)
+    }
