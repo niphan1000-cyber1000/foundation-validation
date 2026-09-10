@@ -76,10 +76,28 @@ def main():
         action="store_true",
         help="Negative control: run a synthetic ERROR result through the real GateDecisionEngine",
     )
+    parser.add_argument("--schema-check", action="append", default=None, metavar="SCHEMA=TARGET",
+                         help="Run the schema domain (SCH- rules) against SCHEMA=TARGET (repeatable). "
+                              "Forwarded to src.cli.run_gate_check(); see its --help for details.")
+    parser.add_argument("--check-traceability", action="store_true",
+                         help="Run the traceability domain (TRC- rules). Forwarded to "
+                              "src.cli.run_gate_check(); off by default.")
+    parser.add_argument("--requirements", default="rules/requirements.json",
+                         help="Path to the requirement catalogue JSON used by the traceability domain")
     args = parser.parse_args()
 
     if args.test_failure_injection:
         sys.exit(_run_failure_injection())
+
+    schema_checks = None
+    if args.schema_check:
+        schema_checks = []
+        for raw in args.schema_check:
+            if "=" not in raw:
+                print(f"[!] ERROR: --schema-check must be SCHEMA=TARGET, got: {raw!r}")
+                sys.exit(2)
+            schema_path, target_path = raw.split("=", 1)
+            schema_checks.append({"schema": schema_path, "target": target_path})
 
     from src.cli import run_gate_check
 
@@ -88,6 +106,9 @@ def main():
         policy_path=args.policy,
         registry_path=args.registry,
         environment=args.env,
+        schema_checks=schema_checks,
+        enable_traceability=args.check_traceability,
+        requirements_path=args.requirements,
     ))
 
 

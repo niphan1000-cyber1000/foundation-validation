@@ -35,7 +35,21 @@ from run_all import run_all_validations  # noqa: E402
 # Maps a GateDecisionEngine validator_name -> the "category" tag that
 # validators/run_all.py attaches to each finding, and the domains_status
 # key it reports execution state under. Both currently use the same string.
-_DOMAINS = (("spectral", "openapi"), ("opa", "policy"))
+#
+# ADVERSARIAL REVIEW FINDING (fixed): this tuple used to only list
+# ("spectral","openapi") and ("opa","policy"). validators/run_all.py's
+# schema and traceability domains were fully implemented and unit-tested
+# there, but were NEVER wired into this list -- so a real SCH-/TRC-
+# finding could make validation_result["status"] == "FAILED" while this
+# function still fed GateDecisionEngine only spectral/opa results and
+# returned ALLOW. Wiring a domain into the aggregator is not the same as
+# wiring it into the decision; both ends have to list it.
+_DOMAINS = (
+    ("spectral", "openapi"),
+    ("opa", "policy"),
+    ("schema", "schema"),
+    ("traceability", "traceability"),
+)
 
 
 def _domain_result(domain_status, findings, category, system_errors):
@@ -63,6 +77,9 @@ def run_gate_check(
     ruleset_path: str = None,
     evidence_dir: str = "evidence_output",
     foundation_sha: str = None,
+    schema_checks=None,
+    enable_traceability: bool = False,
+    requirements_path: str = "rules/requirements.json",
 ) -> int:
     print(f"[*] Loading gate policy from {policy_path}...")
     try:
@@ -79,6 +96,9 @@ def run_gate_check(
         policy_dir=opa_policy_dir,
         ruleset_path=ruleset_path,
         environment=environment,
+        schema_checks=schema_checks,
+        enable_traceability=enable_traceability,
+        requirements_path=requirements_path,
     )
 
     domains = validation_result["execution"]["domains"]
@@ -196,7 +216,28 @@ def main():
     parser.add_argument("--ruleset", default=None, help="Path to an external Spectral ruleset (.spectral.yaml); defaults to Spectral's own auto-discovery")
     parser.add_argument("--evidence-dir", default="evidence_output", help="Directory to write the evidence chain JSON to")
     parser.add_argument("--foundation-sha", default=None, help="Commit SHA of the checked-out Foundation repo this run validated against, recorded into the evidence chain for traceability")
+    parser.add_argument("--schema-check", action="append", default=None, metavar="SCHEMA=TARGET",
+                         help="Run the schema domain (SCH- rules) against SCHEMA=TARGET (repeatable). "
+                              "Omit to leave the schema domain SKIPPED (its default, matching "
+                              "validators/run_all.py's own opt-in behavior).")
+    parser.add_argument("--check-traceability", action="store_true",
+                         help="Run the traceability domain (TRC- rules) against --registry and "
+                              "--requirements. Off by default -- see validators/traceability/README.md "
+                              "for why (no rule in the registry has requirement_id mapped yet).")
+    parser.add_argument("--requirements", default="rules/requirements.json",
+                         help="Path to the requirement catalogue JSON used by the traceability domain")
     args = parser.parse_args()
+
+    schema_checks = None
+    if args.schema_check:
+        schema_checks = []
+        for raw in args.schema_check:
+            if "=" not in raw:
+                print(f"[!] ERROR: --schema-check must be SCHEMA=TARGET, got: {raw!r}")
+                sys.exit(2)
+            schema_path, target_path = raw.split("=", 1)
+            schema_checks.append({"schema": schema_path, "target": target_path})
+
     sys.exit(run_gate_check(
         spec_path=args.spec,
         policy_path=args.policy,
@@ -206,6 +247,9 @@ def main():
         ruleset_path=args.ruleset,
         evidence_dir=args.evidence_dir,
         foundation_sha=args.foundation_sha,
+        schema_checks=schema_checks,
+        enable_traceability=args.check_traceability,
+        requirements_path=args.requirements,
     ))
 
 
