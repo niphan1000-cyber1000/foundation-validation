@@ -50,7 +50,9 @@ from openapi_engine import parse_spectral_output, SpectralOutputError  # noqa: E
 from policy_engine import parse_opa_output, PolicyOutputError  # noqa: E402
 from schema_engine import validate as _validate_schema  # noqa: E402
 from traceability_engine import check_traceability as _check_traceability  # noqa: E402
-from security.security_engine import run_security_scan as _scan_security  # noqa: E402
+from security.security_engine import run_security_scan as _scan_security
+from governance.governance_engine import run_governance_scan as _scan_governance
+from governance.governance_engine import run_governance_scan as _scan_governance  # noqa: E402
 
 PLATFORM_VERSION = "1.0.0"
 
@@ -705,6 +707,7 @@ def main():
                               "(repeatable, e.g. --schema-check schemas/validation-result.schema.json=evidence/audit_evidence.json). "
                               "Uses '=' rather than ':' as the separator so Windows drive-letter paths aren't ambiguous. "
                               "Omit to skip the schema domain (its default).")
+    parser.add_argument("--check-governance", type=str, help="Path to scan for governance compliance")
     parser.add_argument("--check-security", metavar="PATH",
                         help="Opt-in: scan PATH (file or directory) for hardcoded secrets via security_engine. Off by default.")
     parser.add_argument("--check-traceability", action="store_true",
@@ -762,6 +765,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
