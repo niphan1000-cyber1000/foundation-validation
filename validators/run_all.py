@@ -47,7 +47,7 @@ for sub in ("openapi", "policy", "schema", "traceability"):
         sys.path.insert(0, p)
 
 from openapi_engine import parse_spectral_output, SpectralOutputError  # noqa: E402
-from policy_engine import parse_opa_output  # noqa: E402
+from policy_engine import parse_opa_output, PolicyOutputError  # noqa: E402
 from schema_engine import validate as _validate_schema  # noqa: E402
 from traceability_engine import check_traceability as _check_traceability  # noqa: E402
 
@@ -241,6 +241,23 @@ def _resolve_finding(finding, registry, environment):
 
     policy = GATE_POLICIES.get(environment, GATE_POLICIES["production"])
     effective_gate_behavior = policy.get((severity, gate_behavior), gate_behavior)
+
+    # INVARIANT (Gate Cannot Be Cheated, adversarial review finding): a
+    # registered rule's gate_behavior comes straight from rules/registry.yaml
+    # above, verbatim, with no severity check. That means a registry entry
+    # that declares `severity: CRITICAL, gate_behavior: WARN` -- whether
+    # from a careless edit or a tampered SSOT -- was silently resolving to
+    # effective_gate_behavior "WARN", i.e. a CRITICAL finding that would
+    # NOT block. GATE_POLICIES' own comment already states "CRITICAL
+    # always blocks regardless of environment" for environment-level
+    # relaxation (the dev downgrade only ever targets HIGH); this clamp
+    # makes that the same guarantee against a registry-level override too,
+    # since both are just different sources for the same gate_behavior
+    # value up to this point. This line, not the registry, is the trusted
+    # guard: no combination of registry content can produce a non-FAIL
+    # outcome for a CRITICAL finding.
+    if severity == "CRITICAL":
+        effective_gate_behavior = "FAIL"
 
     finding["severity"] = severity
     finding["gate_behavior"] = gate_behavior
@@ -441,7 +458,13 @@ def run_all_validations(
         try:
             raw = _invoke_spectral(spec_path, ruleset_path=ruleset_path)
             domains_status["openapi"] = "RUN"
-        except RuntimeError as e:
+        except Exception as e:
+            # Deliberately broad (not just RuntimeError): a genuine bug in
+            # _invoke_spectral (e.g. an unexpected exception type) must
+            # still resolve to a reported domain ERROR with evidence, not
+            # an uncaught traceback that aborts run_all_validations()
+            # before evidence collection in src/cli.py ever runs -- see
+            # tests/test_gate_cannot_be_cheated.py's "validator crash" case.
             raw = []
             domains_status["openapi"] = "ERROR"
             system_errors.append(f"openapi: {e}")
@@ -452,12 +475,14 @@ def run_all_validations(
     if raw is not None:
         try:
             openapi_findings = parse_spectral_output(raw, target_path=str(spec_path or ""))
-        except SpectralOutputError as e:
-            # A Spectral invocation that "succeeded" (non-empty stdout) but
-            # produced output we can't actually interpret must not be
-            # silently treated as zero findings - that would disable this
-            # entire validation domain without anyone noticing. Downgrade
-            # to the same ERROR path as an invocation failure.
+        except Exception as e:
+            # Deliberately broad, not just SpectralOutputError: a crash
+            # while parsing (e.g. a malformed item inside an otherwise
+            # well-formed array) must fail the domain the same way a
+            # recognized bad-shape error does, not propagate as an
+            # uncaught exception. See the "validator crash" /
+            # "malformed JSON" rows in tests/test_gate_cannot_be_cheated.py
+            # and validators/tests/test_adversarial_matrix.py.
             openapi_findings = []
             domains_status["openapi"] = "ERROR"
             system_errors.append(f"openapi: {e}")
@@ -478,7 +503,7 @@ def run_all_validations(
         try:
             raw_opa = _invoke_opa(spec_path, policy_dir=policy_dir)
             domains_status["policy"] = "RUN" if raw_opa is not None else "NOT_APPLICABLE"
-        except RuntimeError as e:
+        except Exception as e:
             raw_opa = None
             domains_status["policy"] = "ERROR"
             system_errors.append(f"policy: {e}")
@@ -487,7 +512,14 @@ def run_all_validations(
         domains_status["policy"] = "SKIPPED"
 
     if raw_opa is not None:
-        policy_findings = parse_opa_output(raw_opa, target_path=str(spec_path or ""))
+        try:
+            policy_findings = parse_opa_output(raw_opa, target_path=str(spec_path or ""))
+        except Exception as e:
+            # Deliberately broad, not just PolicyOutputError -- see the
+            # matching comment on the openapi domain's parse step above.
+            policy_findings = []
+            domains_status["policy"] = "ERROR"
+            system_errors.append(f"policy: {e}")
         for f in policy_findings:
             f["category"] = "policy"
         findings.extend(policy_findings)

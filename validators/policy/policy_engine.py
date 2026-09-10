@@ -1,6 +1,28 @@
 import json
 
 
+class PolicyOutputError(ValueError):
+    """Raised when opa_data is shaped like an `opa eval` compile/parse
+    error payload ({"errors": [...]}) rather than a real result set.
+
+    ADVERSARIAL REVIEW FINDING (fixed): `_invoke_opa` in run_all.py
+    already checks for this shape and raises before parse_opa_output ever
+    sees it -- but only for the one call path that goes through
+    `_invoke_opa` itself. Any other caller that already has raw `opa
+    eval` JSON (e.g. run_all_validations(opa_json_data=...), used by this
+    engine's own tests and any future caching/injection layer) reached
+    parse_opa_output directly, which had no such check: the `elif
+    isinstance(results, dict):` fallback branch below silently read
+    `results.get("deny", []) or results.get("violations", [])` on a
+    payload that has neither key, producing an empty violations list --
+    i.e. a broken/uncompilable Rego policy was silently reported as
+    "zero violations found" (a PASS) at this layer, regardless of what
+    _invoke_opa's own guard does elsewhere. The check now lives in the
+    parsing function itself, not just one caller of it, so it can't be
+    bypassed by a different call path.
+    """
+
+
 def parse_opa_output(opa_data, target_path=""):
     """
     Parses `opa eval --format json <query>` output and maps every
@@ -15,6 +37,10 @@ def parse_opa_output(opa_data, target_path=""):
     a previous version of this function looked for that shape directly
     and silently found zero violations on every real `opa eval` run,
     regardless of what the policy actually detected.
+
+    Raises PolicyOutputError (not a silent []) if opa_data is a
+    {"errors": [...]} payload -- `opa eval`'s shape for a policy that
+    failed to compile/evaluate. See PolicyOutputError's docstring.
     """
     findings = []
 
@@ -27,6 +53,13 @@ def parse_opa_output(opa_data, target_path=""):
         results = opa_data
     else:
         return findings
+
+    if isinstance(results, dict) and results.get("errors"):
+        first_err = results["errors"][0] if results["errors"] else {}
+        loc = first_err.get("location", {}) if isinstance(first_err, dict) else {}
+        where = f"{loc.get('file', target_path or 'policy')}:{loc.get('row', '?')}" if loc else (target_path or "policy")
+        message = first_err.get("message", "unknown error") if isinstance(first_err, dict) else str(first_err)
+        raise PolicyOutputError(f"OPA policy failed to compile/evaluate at {where}: {message}")
 
     violations = []
 

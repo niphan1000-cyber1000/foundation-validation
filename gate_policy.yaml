@@ -13,6 +13,12 @@ rules:
   opa:
     on_fail: BLOCK
     on_error: BLOCK
+  schema:
+    on_fail: BLOCK
+    on_error: BLOCK
+  traceability:
+    on_fail: BLOCK
+    on_error: BLOCK
   trivy:
     on_fail: WARN
     on_error: BLOCK
