@@ -1,4 +1,4 @@
-﻿from validators.security.security_engine import run_security_scan
+from validators.security.security_engine import run_security_scan
 """
 run_all.py â€” Foundation Validation Engine master gate.
 
@@ -77,7 +77,7 @@ GATE_POLICIES = {
 }
 
 
-def load_registry(registry_path="rules/registry.yaml"):
+def load_registry(registry_path="rules/registry.yaml,registry/rules.yaml"):
     """Load one or more rule registries into a single {rule_id: rule_dict}
     map. `registry_path` may be a single path or a comma-separated list of
     paths (e.g. "rules/registry.yaml,../foundation/rules/registry.yaml"),
@@ -402,7 +402,7 @@ def _invoke_opa(spec_path, policy_dir="policies"):
 
 def run_all_validations(
     spec_path=None,
-    registry_path="rules/registry.yaml",
+    registry_path="rules/registry.yaml,registry/rules.yaml",
     openapi_json_data=None,
     opa_json_data=None,
     policy_dir="policies",
@@ -590,12 +590,18 @@ def run_all_validations(
     # --- Security domain (opt-in via security_target / security_json_data) ---
     security_findings = []
     if security_json_data is not None:
-        security_findings = security_json_data
+        security_findings = security_json_data.get("findings", []) if isinstance(security_json_data, dict) else security_json_data
         domains_status["security"] = "RUN"
     elif security_target:
         try:
-            security_findings = _scan_security(security_target)
-            domains_status["security"] = "RUN"
+            _security_result = _scan_security(security_target)
+            if isinstance(_security_result, dict) and _security_result.get("status") == "ERROR":
+                security_findings = []
+                domains_status["security"] = "ERROR"
+                system_errors.append(f"security: {_security_result.get('message')}")
+            else:
+                security_findings = _security_result.get("findings", []) if isinstance(_security_result, dict) else _security_result
+                domains_status["security"] = "RUN"
         except Exception as e:
             security_findings = []
             domains_status["security"] = "ERROR"
@@ -698,7 +704,7 @@ def main():
     parser.add_argument("--spec", required=True, help="Path to the OpenAPI spec file to validate")
     parser.add_argument("--sarif", help="Path to write a SARIF report to")
     parser.add_argument("--output", help="Path to write the full ValidationResultContract JSON to")
-    parser.add_argument("--registry", default="rules/registry.yaml", help="Path to rule registry YAML, or a comma-separated list of registry YAML paths to merge (later paths win on rule_id conflicts)")
+    parser.add_argument("--registry", default="rules/registry.yaml,registry/rules.yaml", help="Path to rule registry YAML, or a comma-separated list of registry YAML paths to merge (later paths win on rule_id conflicts)")
     parser.add_argument("--policies", default="policies", help="Path to the OPA policy directory")
     parser.add_argument("--ruleset", default=None, help="Path to a Spectral ruleset (.spectral.yaml) to lint against; defaults to Spectral's own auto-discovery")
     parser.add_argument("--env", default="production", choices=sorted(GATE_POLICIES.keys()),
