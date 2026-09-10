@@ -41,7 +41,7 @@ except ImportError:
     yaml = None
 
 BASE_DIR = Path(__file__).resolve().parent
-for sub in ("openapi", "policy", "schema", "traceability"):
+for sub in ("openapi", "policy", "schema", "traceability", "security"):
     p = str(BASE_DIR / sub)
     if p not in sys.path:
         sys.path.insert(0, p)
@@ -50,6 +50,7 @@ from openapi_engine import parse_spectral_output, SpectralOutputError  # noqa: E
 from policy_engine import parse_opa_output, PolicyOutputError  # noqa: E402
 from schema_engine import validate as _validate_schema  # noqa: E402
 from traceability_engine import check_traceability as _check_traceability  # noqa: E402
+from security.security_engine import run_security_scan as _scan_security  # noqa: E402
 
 PLATFORM_VERSION = "1.0.0"
 
@@ -409,6 +410,8 @@ def run_all_validations(
     enable_traceability=False,
     requirements_path="rules/requirements.json",
     traceability_json_data=None,
+    security_target=None,
+    security_json_data=None,
 ):
     """Aggregate the OpenAPI, Policy, Schema, and Traceability domains
     into a single ValidationResultContract-shaped dict.
@@ -581,6 +584,30 @@ def run_all_validations(
             "rule_count": len(traceability_findings),
         })
 
+    # --- Security domain (opt-in via security_target / security_json_data) ---
+    security_findings = []
+    if security_json_data is not None:
+        security_findings = security_json_data
+        domains_status["security"] = "RUN"
+    elif security_target:
+        try:
+            security_findings = _scan_security(security_target)
+            domains_status["security"] = "RUN"
+        except Exception as e:
+            security_findings = []
+            domains_status["security"] = "ERROR"
+            system_errors.append(f"security: {e}")
+    else:
+        domains_status["security"] = "SKIPPED"
+
+    if domains_status["security"] == "RUN":
+        findings.extend(security_findings)
+        artifacts.append({
+            "domain": "security",
+            "target_file": str(security_target) if security_target else "injected",
+            "rule_count": len(security_findings),
+        })
+
     # --- Resolve every finding against the registry + gate policy ---
     findings = [_resolve_finding(f, registry, environment) for f in findings]
 
@@ -678,6 +705,8 @@ def main():
                               "(repeatable, e.g. --schema-check schemas/validation-result.schema.json=evidence/audit_evidence.json). "
                               "Uses '=' rather than ':' as the separator so Windows drive-letter paths aren't ambiguous. "
                               "Omit to skip the schema domain (its default).")
+    parser.add_argument("--check-security", metavar="PATH",
+                        help="Opt-in: scan PATH (file or directory) for hardcoded secrets via security_engine. Off by default.")
     parser.add_argument("--check-traceability", action="store_true",
                          help="Run the traceability domain (TRC- rules) against --registry and "
                               "--requirements. Off by default: no rule in this repo's registry has "
@@ -712,6 +741,7 @@ def main():
         schema_checks=schema_checks,
         enable_traceability=args.check_traceability,
         requirements_path=args.requirements,
+        security_target=args.check_security,
     )
 
     print(json.dumps(result, indent=2))
@@ -732,4 +762,12 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
+
+
 
