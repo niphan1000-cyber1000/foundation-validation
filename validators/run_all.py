@@ -415,6 +415,8 @@ def run_all_validations(
     traceability_json_data=None,
     security_target=None,
     security_json_data=None,
+    governance_target=None,
+    governance_json_data=None,
 ):
     """Aggregate the OpenAPI, Policy, Schema, and Traceability domains
     into a single ValidationResultContract-shaped dict.
@@ -617,6 +619,39 @@ def run_all_validations(
             "rule_count": len(security_findings),
         })
 
+    # --- Governance domain (opt-in via governance_target / governance_json_data) ---
+    governance_findings = []
+    if governance_json_data is not None:
+        governance_findings = governance_json_data.get("findings", []) if isinstance(governance_json_data, dict) else governance_json_data
+        domains_status["governance"] = "RUN"
+    elif governance_target:
+        try:
+            _governance_result = _scan_governance(governance_target)
+            if isinstance(_governance_result, dict) and _governance_result.get("status") == "ERROR":
+                governance_findings = []
+                domains_status["governance"] = "ERROR"
+                system_errors.append(f"governance: {_governance_result.get('message')}")
+            else:
+                governance_findings = _governance_result.get("findings", []) if isinstance(_governance_result, dict) else _governance_result
+                domains_status["governance"] = "RUN"
+        except Exception as e:
+            governance_findings = []
+            domains_status["governance"] = "ERROR"
+            system_errors.append(f"governance: {e}")
+    else:
+        domains_status["governance"] = "SKIPPED"
+
+    if domains_status["governance"] == "RUN":
+        for f in governance_findings:
+            if isinstance(f, dict):
+                f.setdefault("category", "governance")
+        findings.extend(governance_findings)
+        artifacts.append({
+            "domain": "governance",
+            "target_file": str(governance_target) if governance_target else "injected",
+            "rule_count": len(governance_findings),
+        })
+
     # --- Resolve every finding against the registry + gate policy ---
     findings = [_resolve_finding({"message": f} if isinstance(f, str) else f, registry, environment) for f in findings]
 
@@ -752,6 +787,7 @@ def main():
         enable_traceability=args.check_traceability,
         requirements_path=args.requirements,
         security_target=args.check_security,
+        governance_target=args.check_governance,
     )
 
     print(json.dumps(result, indent=2))
