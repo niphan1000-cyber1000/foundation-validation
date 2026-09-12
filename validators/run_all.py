@@ -612,6 +612,9 @@ def run_all_validations(
         domains_status["security"] = "SKIPPED"
 
     if domains_status["security"] == "RUN":
+        for f in security_findings:
+            if isinstance(f, dict):
+                f.setdefault("category", "security")
         findings.extend(security_findings)
         artifacts.append({
             "domain": "security",
