@@ -79,39 +79,57 @@ GATE_POLICIES = {
 
 def load_registry(registry_path="rules/registry.yaml,registry/rules.yaml"):
     """Load one or more rule registries into a single {rule_id: rule_dict}
-    map. `registry_path` may be a single path or a comma-separated list of
-    paths (e.g. "rules/registry.yaml,../foundation/rules/registry.yaml"),
-    so a Studio gate can merge this engine's own bundled registry with an
-    external SSOT registry (e.g. Foundation's) that documents rule_ids
-    from a ruleset/policy-dir this engine doesn't own.
+    map. registry_path may be a single path or a comma-separated list of
+    paths, so a Studio gate can merge this engine's own bundled registry
+    with an external SSOT registry that documents rule_ids from a
+    ruleset/policy-dir this engine doesn't own.
 
-    Paths are loaded in order and merged; a rule_id defined in a later
-    path overrides the same rule_id from an earlier path, so callers
-    should list the more-authoritative registry last (Foundation's, for
-    an external SSOT, after this engine's own).
+    Paths are loaded in order and merged. A rule_id that appears in more
+    than one path is only allowed when every occurrence is identical;
+    otherwise this is a genuine identity conflict and MUST raise rather
+    than silently letting the later path win. A silent override here is
+    exactly the failure mode that let a generic engine-level rule_id
+    shadow a more specific, field-level rule_id from another registry
+    with no error and no log line.
 
-    A missing file is not a hard error (a Studio may not have an external
-    registry yet) but IS logged to stderr, since a silently-missing
-    registry is exactly what caused every finding to fall through to the
-    fail-safe default in the past — that fallback should be a visible,
-    logged event, not a silent one.
+    A missing file is not a hard error but IS logged to stderr, since a
+    silently-missing registry is exactly what caused every finding to
+    fall through to the fail-safe default in the past.
 
-    Returns {} only if no path resolves to any rules at all (fail-safe
-    severity-based defaults then apply to every finding; see
-    _resolve_finding)."""
+    Returns empty dict only if no path resolves to any rules at all.
+
+    Raises:
+        ValueError: if the same rule_id has conflicting definitions
+            across two or more of the given paths.
+    """
     if not yaml:
         return {}
     rules = {}
+    sources = {}
     paths = [p.strip() for p in str(registry_path).split(",") if p.strip()]
     for raw_path in paths:
         path = Path(raw_path)
         if not path.exists():
-            print(f"WARNING: registry file not found, skipping: {path}", file=sys.stderr)
+            print("WARNING: registry file not found, skipping: " + str(path), file=sys.stderr)
             continue
         with open(path, "r", encoding="utf-8-sig") as f:
             data = yaml.safe_load(f) or {}
         for rule in data.get("rules", []):
-            rules[rule.get("rule_id") or rule.get("id")] = rule
+            rule_id = rule.get("rule_id") or rule.get("id")
+            if rule_id in rules and rules[rule_id] != rule:
+                old_source = str(sources[rule_id])
+                new_source = str(path)
+                old_def = str(rules[rule_id])
+                new_def = str(rule)
+                msg = "Conflicting definitions for rule_id " + str(rule_id) + ": "
+                msg += old_source + " defines " + old_def + ", but "
+                msg += new_source + " defines " + new_def + ". "
+                msg += "Duplicate rule_ids across registries must be "
+                msg += "identical or use distinct ids -- refusing to "
+                msg += "silently override."
+                raise ValueError(msg)
+            rules[rule_id] = rule
+            sources[rule_id] = path
     return rules
 
 
