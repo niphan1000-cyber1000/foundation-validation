@@ -78,3 +78,53 @@ def test_load_registry_distinct_rule_ids_across_paths_merge_normally():
         result = load_registry(path_a + "," + path_b)
         assert result["TEST-A-001"]["severity"] == "HIGH"
         assert result["TEST-B-001"]["severity"] == "MEDIUM"
+
+def test_load_registry_rejects_governance_rule_without_gov_prefix():
+    """domain=governance requires rule_id to start with GOV- (covers both
+    GOV-* API/spec rules and GOV-DOC-* document rules). Anything else is
+    a namespace-convention violation and must raise rather than silently
+    enter the registry."""
+    import tempfile
+    import os
+    from validators.run_all import load_registry
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = os.path.join(tmpdir, "bad_registry.yaml")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(
+                "rules:\n"
+                "  - rule_id: BAD-001-NO-PREFIX\n"
+                "    domain: governance\n"
+                "    severity: HIGH\n"
+            )
+        raised = False
+        try:
+            load_registry(path)
+        except ValueError as e:
+            raised = True
+            assert "BAD-001-NO-PREFIX" in str(e)
+            assert "GOV-" in str(e)
+        assert raised, "expected ValueError for governance rule without GOV- prefix"
+
+
+def test_load_registry_accepts_gov_and_gov_doc_prefixes():
+    """Both GOV-* and GOV-DOC-* are valid under domain=governance."""
+    import tempfile
+    import os
+    from validators.run_all import load_registry
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = os.path.join(tmpdir, "ok_registry.yaml")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(
+                "rules:\n"
+                "  - rule_id: GOV-099-TEST\n"
+                "    domain: governance\n"
+                "    severity: MEDIUM\n"
+                "  - rule_id: GOV-DOC-099-TEST\n"
+                "    domain: governance\n"
+                "    severity: HIGH\n"
+            )
+        result = load_registry(path)
+        assert "GOV-099-TEST" in result
+        assert "GOV-DOC-099-TEST" in result
