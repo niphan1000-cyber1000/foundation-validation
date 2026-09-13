@@ -7,7 +7,3 @@
     domain: security
     severity: CRITICAL
     enabled: true
-  - rule_id: GOV-001
-    domain: governance
-    severity: HIGH
-    enabled: true
