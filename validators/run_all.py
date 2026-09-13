@@ -100,7 +100,9 @@ def load_registry(registry_path="rules/registry.yaml,registry/rules.yaml"):
 
     Raises:
         ValueError: if the same rule_id has conflicting definitions
-            across two or more of the given paths.
+            across two or more of the given paths, or if a rule with
+            domain "governance" uses a rule_id that does not start
+            with the required GOV- / GOV-DOC- namespace prefix.
     """
     if not yaml:
         return {}
@@ -116,6 +118,19 @@ def load_registry(registry_path="rules/registry.yaml,registry/rules.yaml"):
             data = yaml.safe_load(f) or {}
         for rule in data.get("rules", []):
             rule_id = rule.get("rule_id") or rule.get("id")
+            # Namespace convention: governance rules must use GOV-* or GOV-DOC-*
+            # prefix. This prevents future collisions between API/spec-level
+            # (GOV-*) and document-level (GOV-DOC-*) rules that share the
+            # same domain key in the registry.
+            domain = (rule.get("domain") or "").strip().lower()
+            if domain == "governance" and rule_id and not str(rule_id).startswith("GOV-"):
+                raise ValueError(
+                    "Invalid rule_id for domain 'governance': "
+                    + repr(rule_id)
+                    + ". Governance rules must use the GOV-* or GOV-DOC-* "
+                    + "namespace prefix (see rules/taxonomy.json and the "
+                    + "GOV vs GOV-DOC convention)."
+                )
             if rule_id in rules and rules[rule_id] != rule:
                 old_source = str(sources[rule_id])
                 new_source = str(path)
