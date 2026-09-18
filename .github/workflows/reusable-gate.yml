@@ -1,4 +1,4 @@
-name: Reusable Governance Gate
+﻿name: Reusable Governance Gate
 
 # Called by a Studio repo like:
 #
@@ -21,7 +21,7 @@ name: Reusable Governance Gate
 #   - Installs Spectral CLI globally so CI does not rely on `npx` download
 #     (which frequently times out on GitHub-hosted runners).
 #   - Does not yet support multiple specs per call, custom gate_policy.yaml
-#     overrides from the Studio, or SARIF upload — those are follow-ups
+#     overrides from the Studio, or SARIF upload â€” those are follow-ups
 #     once this MVP is proven working end-to-end.
 
 on:
@@ -90,7 +90,7 @@ jobs:
         run: echo "sha=$(git -C foundation rev-parse HEAD)" >> "$GITHUB_OUTPUT"
         # Ties the evidence chain to an exact, re-checkoutable point in
         # Foundation's history (inputs.foundation_ref is a branch name
-        # like "main", which moves — the commit SHA doesn't). Without
+        # like "main", which moves â€” the commit SHA doesn't). Without
         # this, "what ruleset/policy version actually backed this
         # decision" could only ever be answered as "whatever main was at
         # some point," which isn't independently verifiable after the
@@ -102,6 +102,7 @@ jobs:
           repository: niphan1000-cyber1000/foundation-validation
           ref: ${{ inputs.engine_ref }}
           path: engine
+          token: ${{ secrets.foundation_pat }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -147,7 +148,7 @@ jobs:
         # if: always() is the whole point of this step: evidence_output/
         # only existed inside this ephemeral runner's filesystem and was
         # discarded the moment the job ended, on both success AND failure
-        # — so a BLOCKed run's evidence (arguably the case you most want
+        # â€” so a BLOCKed run's evidence (arguably the case you most want
         # to keep, to know exactly what tripped the gate) was just as
         # unrecoverable as an ALLOWed one. Without `always()`, a failed
         # "Run Governance Gate" step would skip this upload entirely by
@@ -158,3 +159,4 @@ jobs:
           path: engine/evidence_output/
           retention-days: 90
           if-no-files-found: warn
+
