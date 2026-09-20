@@ -1,4 +1,4 @@
-﻿# OpenAPI Validator (OAS Domain)
+# OpenAPI Validator (OAS Domain)
 
 Wraps Spectral CLI output and maps OAS linting findings into the unified Finding/Evidence data contract.
 

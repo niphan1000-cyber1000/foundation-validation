@@ -1,4 +1,4 @@
-﻿version: "1.0"
+version: "1.0"
 allow_override: false
 
 # Per-validator gate policy. Consumed by src/core/engine.py::GateDecisionEngine.

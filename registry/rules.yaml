@@ -1,4 +1,4 @@
-﻿rules:
+rules:
   - rule_id: OAS-001
     domain: openapi
     severity: MEDIUM

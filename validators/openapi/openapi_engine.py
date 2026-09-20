@@ -1,4 +1,4 @@
-﻿import json
+import json
 
 class SpectralOutputError(ValueError):
     """Raised when Spectral's JSON output isn't shaped as expected.

@@ -1,6 +1,6 @@
 from validators.security.security_engine import run_security_scan
 """
-run_all.py â€” Foundation Validation Engine master gate.
+run_all.py — Foundation Validation Engine master gate.
 
 Aggregates findings from the OpenAPI (Spectral) and Policy (OPA) domains,
 resolves each finding's severity/gate_behavior against rules/registry.yaml
@@ -8,11 +8,11 @@ resolves each finding's severity/gate_behavior against rules/registry.yaml
 ValidationResultContract object matching schemas/validation-result.schema.json.
 
 Two entry points:
-  * run_all_validations(...)  â€” importable function, used by tests and by
+  * run_all_validations(...)  — importable function, used by tests and by
     anything that wants to inject already-fetched tool output (openapi_json_data /
     opa_json_data) instead of shelling out to spectral/opa. This is what
     validators/tests/test_aggregator.py exercises.
-  * CLI (`python run_all.py --spec ...`) â€” the real gate used by CI and the
+  * CLI (`python run_all.py --spec ...`) — the real gate used by CI and the
     pre-commit hook. It invokes Spectral and OPA itself, then calls
     run_all_validations() with the live output.
 
@@ -23,7 +23,7 @@ this repo):
   * A tool (spectral/opa) that can't be invoked is a hard ERROR, not a
     silent "no findings".
   * A rule_id with no entry in rules/registry.yaml still gets a fail-safe
-    default gate_behavior based on severity â€” it is never silently ignored.
+    default gate_behavior based on severity — it is never silently ignored.
 """
 
 import argparse
@@ -154,7 +154,7 @@ def load_requirements(requirements_path="rules/requirements.json"):
 
     Mirrors load_registry()'s fail-safe philosophy: a missing catalogue
     file is not a hard error (most repos won't have adopted one yet) but
-    IS logged to stderr, and returns {} â€” which check_traceability()
+    IS logged to stderr, and returns {} — which check_traceability()
     treats as "no catalogue exists", never as "everything is covered".
     """
     path = Path(requirements_path)
@@ -210,7 +210,7 @@ def _run_schema_check(schema_path, target_path):
 
     Raises on any load/validate problem (missing file, bad JSON/YAML, or
     a schema keyword schema_engine.py doesn't support) rather than
-    swallowing it â€” same fail-safe rule as every other domain in this
+    swallowing it — same fail-safe rule as every other domain in this
     file: a check that couldn't actually run is a system ERROR, never a
     silent pass.
     """
@@ -308,7 +308,7 @@ def _resolve_executable(name):
 
     shutil.which() checks PATHEXT on Windows (so it correctly finds e.g.
     npx.cmd for "npx"), which subprocess.run([name, ...]) does NOT do on
-    its own when shell=False â€” that mismatch is what produced
+    its own when shell=False — that mismatch is what produced
     "WinError 2: The system cannot find the file specified" for a tool
     that clearly works fine when typed directly into PowerShell. Returns
     None if the tool truly isn't on PATH.
@@ -322,7 +322,7 @@ def _parse_leading_json(text, tool_name):
 
     Some CLI wrappers (notably `npx` on Windows, and sometimes OPA)
     print a valid JSON payload to stdout immediately followed by an
-    unrelated notice/warning line with no separating newline â€” a plain
+    unrelated notice/warning line with no separating newline — a plain
     json.loads() then fails with "Extra data" even though the tool's
     actual output was perfectly valid. json.JSONDecoder.raw_decode()
     parses only the leading value and reports where it ended, which is
@@ -361,7 +361,7 @@ def _invoke_spectral(spec_path, ruleset_path=None):
     """
     npx = _resolve_executable("npx")
     if not npx:
-        raise RuntimeError("npx not found on PATH â€” is Node.js installed?")
+        raise RuntimeError("npx not found on PATH — is Node.js installed?")
     cmd = [npx, "--yes", "@stoplight/spectral-cli", "lint", str(spec_path), "-f", "json"]
     if ruleset_path is not None:
         cmd.extend(["-r", str(ruleset_path)])
@@ -377,7 +377,7 @@ def _invoke_spectral(spec_path, ruleset_path=None):
 
     stdout = (proc.stdout or "").strip()
     if not stdout:
-        # A clean Spectral lint with `-f json` still prints "[]" â€” empty
+        # A clean Spectral lint with `-f json` still prints "[]" — empty
         # stdout means the CLI itself didn't run (missing package, no
         # network, bad invocation, etc.), which is a system error, not
         # "no findings". Surface stderr so the real cause is visible.
@@ -397,7 +397,7 @@ def _invoke_opa(spec_path, policy_dir="policies"):
         return None
     opa = _resolve_executable("opa")
     if not opa:
-        raise RuntimeError("opa not found on PATH â€” is OPA CLI installed?")
+        raise RuntimeError("opa not found on PATH — is OPA CLI installed?")
     try:
         proc = subprocess.run(
             [opa, "eval", "--data", policy_dir, "--input", str(spec_path),
@@ -420,7 +420,7 @@ def _invoke_opa(spec_path, policy_dir="policies"):
     # `opa eval` reports Rego compile/parse errors as a 0-exit-code JSON
     # payload shaped {"errors": [...]}, NOT as {"result": [...]}. Treating
     # that as "zero violations found" would silently turn a broken policy
-    # file into a clean pass â€” the opposite of this project's fail-safe
+    # file into a clean pass — the opposite of this project's fail-safe
     # design (a tool that can't actually evaluate the policy is a hard
     # ERROR, same as a missing/uninvokable binary).
     if isinstance(parsed, dict) and parsed.get("errors"):
@@ -461,7 +461,7 @@ def run_all_validations(
     itself. When none of the four domains has either injected data or the
     input it needs to run (spec_path for openapi/policy, schema_checks for
     schema, enable_traceability=True for traceability), that domain is
-    SKIPPED â€” with an empty spec_path/schema_checks and
+    SKIPPED — with an empty spec_path/schema_checks and
     enable_traceability=False this is an empty PASS, which is what lets
     run_all_validations() be called with no arguments in unit tests.
 
@@ -481,7 +481,7 @@ def run_all_validations(
     requirements_path. It defaults to False: as of registry v1.2.0 every
     rule's requirement_id is null, so turning this on will immediately
     surface a TRC-001 HIGH finding (and therefore a FAILED gate in
-    production) for every currently active FAIL-gated rule â€” a real,
+    production) for every currently active FAIL-gated rule — a real,
     pre-existing gap, not a bug, but one this function won't spring on a
     caller who hasn't opted in. See traceability_engine.py.
     """
@@ -771,7 +771,7 @@ def _write_sarif(result, sarif_path, registry):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Foundation Validation Engine â€” master gate")
+    parser = argparse.ArgumentParser(description="Foundation Validation Engine — master gate")
     parser.add_argument("--spec", required=True, help="Path to the OpenAPI spec file to validate")
     parser.add_argument("--sarif", help="Path to write a SARIF report to")
     parser.add_argument("--output", help="Path to write the full ValidationResultContract JSON to")

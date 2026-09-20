@@ -1,0 +1,19 @@
+# CODEOWNERS for foundation-validation
+#
+# Referenced directly in SECURITY.md's threat model as the mitigation for
+# "Softened policy in a PR" — required reviewers on every path, with the
+# security-sensitive paths listed explicitly (per CONTRIBUTING.md /
+# SECURITY.md "Security Review Process") so it's obvious at a glance which
+# changes always need eyes, not just because a rule engine says so.
+
+# Default owner — everything not matched below
+*                                   @niphan1000-cyber1000
+
+# Security-sensitive paths (see SECURITY.md > Security Review Process)
+/validators/security/              @niphan1000-cyber1000
+/security/                         @niphan1000-cyber1000
+/policies/                         @niphan1000-cyber1000
+/gate_policy.yaml                  @niphan1000-cyber1000
+/.github/workflows/                @niphan1000-cyber1000
+/rules/registry.yaml               @niphan1000-cyber1000
+/registry/rules.yaml               @niphan1000-cyber1000

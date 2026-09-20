@@ -1,4 +1,4 @@
-﻿# Policy Validator (OPA / Rego Domain)
+# Policy Validator (OPA / Rego Domain)
 
 Wraps OPA evaluation output and maps policy violations into the unified Finding/Evidence data contract.
 
