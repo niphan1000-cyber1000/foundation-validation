@@ -1,4 +1,4 @@
-﻿import subprocess
+import subprocess
 import sys
 
 def test_run_all_success_or_block():

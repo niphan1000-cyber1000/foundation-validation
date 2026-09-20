@@ -1,4 +1,4 @@
-﻿extends: ["spectral:oas"]
+extends: ["spectral:oas"]
 
 rules:
   OAS-001-path-kebab-case:

@@ -12,7 +12,7 @@
 Please **DO NOT** open a public issue for security vulnerabilities.
 
 Instead:
-1. Email: security@cloudforge.example.com (replace with actual)
+1. Email: niphan1000@gmail.com
 2. Or use GitHub Security Advisories on this repository
 
 We will respond within 48 hours.

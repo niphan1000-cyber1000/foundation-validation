@@ -1,4 +1,4 @@
-﻿def test_resolve_finding_unknown_rule_uses_severity_based_fallback():
+def test_resolve_finding_unknown_rule_uses_severity_based_fallback():
     """An unregistered rule_id must never be silently ignored, but it also
     must not be blanket-escalated to CRITICAL/FAIL regardless of what the
     tool itself reported — that makes an unregistered LOW finding

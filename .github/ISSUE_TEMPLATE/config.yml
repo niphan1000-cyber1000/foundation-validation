@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions / support
+    url: https://github.com/CloudForge-Platform-Foundation-dev/foundation-validation/discussions
+    about: See SUPPORT.md — general questions go to Discussions, not Issues.

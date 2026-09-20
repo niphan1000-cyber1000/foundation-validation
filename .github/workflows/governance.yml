@@ -1,4 +1,4 @@
-﻿name: Governance Gate Check
+name: Governance Gate Check
 
 on:
   push:
