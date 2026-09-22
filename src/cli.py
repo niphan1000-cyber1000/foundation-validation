@@ -23,6 +23,14 @@ from src.core.models import ValidatorResult, ValidationState, GateAction
 from src.core.engine import GateDecisionEngine
 from src.core.evidence import EvidenceCollector, hash_paths, hash_file, hash_directory
 
+# Identity Contract validator (CloudForge Identity Contract v1 §8).
+# Lives under validators/identity_contract/ and is wired here so its result
+# flows through the same GateDecisionEngine path as spectral/opa/schema/
+# traceability — One Rule → One Owner → One Authoritative Enforcement Path.
+_IDENTITY_CONTRACT_DIR = Path(__file__).resolve().parent.parent / "validators" / "identity_contract"
+if str(_IDENTITY_CONTRACT_DIR) not in sys.path:
+    sys.path.insert(0, str(_IDENTITY_CONTRACT_DIR))
+
 # validators/run_all.py is a standalone module (not a package import path),
 # so it needs its directory on sys.path the same way validators/run_all.py
 # itself adds validators/openapi and validators/policy.
@@ -68,6 +76,85 @@ def _domain_result(domain_status, findings, category, system_errors):
     return ValidationState.PASS, 0, None
 
 
+def _run_identity_contract(studio_root: Path) -> tuple[ValidatorResult, list[dict]]:
+    """Run the identity-contract validator against an explicit Studio
+    checkout root. Fail-closed: import errors / crashes become ERROR.
+
+    Only ever called when the caller explicitly opts in (see
+    `identity_contract_root` on run_gate_check) — this validator has no
+    business guessing a target from --spec's directory, since --spec's
+    default ("openapi.yaml") resolves to *whatever repo run_gate_check
+    happens to run from*, including this engine's own repo when tests or
+    other callers invoke it without specifying a Studio. An unconditional
+    scan of "wherever we happen to be" previously made
+    tests/test_gate_cannot_be_cheated.py's
+    test_regression_pre_fix_domains_tuple_would_have_allowed fail, by
+    picking up 4 unrelated findings against this engine's own
+    openapi.yaml (its own API describing /v1/validations etc., which has
+    nothing to do with any Studio's JWT scope contract).
+    """
+    try:
+        from validate_identity_contract import run_check  # type: ignore
+    except Exception as exc:  # noqa: BLE001
+        return (
+            ValidatorResult(
+                validator_name="identity-contract",
+                state=ValidationState.ERROR,
+                findings_count=0,
+                error_message=f"failed to import identity-contract validator: {exc}",
+            ),
+            [],
+        )
+
+    try:
+        raw = run_check(studio_root)
+    except Exception as exc:  # noqa: BLE001
+        return (
+            ValidatorResult(
+                validator_name="identity-contract",
+                state=ValidationState.ERROR,
+                findings_count=0,
+                error_message=f"identity-contract validator crashed: {exc}",
+            ),
+            [],
+        )
+
+    action = (raw or {}).get("action", "BLOCK")
+    reasons = (raw or {}).get("reasons") or []
+    findings = [
+        {
+            "rule_id": "IDENTITY-CONTRACT",
+            "message": reason,
+            "severity": "error",
+            "gate_behavior": "FAIL",
+            "effective_gate_behavior": "FAIL",
+            "rule_version": "v1",
+        }
+        for reason in reasons
+    ]
+
+    if action == "PASS":
+        state = ValidationState.PASS
+        count = 0
+        err = None
+    else:
+        # BLOCK from the validator maps to FAIL so gate_policy on_fail applies;
+        # true tool/crash cases already returned ERROR above.
+        state = ValidationState.FAIL
+        count = len(reasons) or 1
+        err = None
+
+    return (
+        ValidatorResult(
+            validator_name="identity-contract",
+            state=state,
+            findings_count=count,
+            error_message=err,
+        ),
+        findings,
+    )
+
+
 def run_gate_check(
     spec_path: str = "openapi.yaml",
     policy_path: str = "gate_policy.yaml",
@@ -80,6 +167,7 @@ def run_gate_check(
     schema_checks=None,
     enable_traceability: bool = False,
     requirements_path: str = "rules/requirements.json",
+    identity_contract_root: str = None,
 ) -> int:
     print(f"[*] Loading gate policy from {policy_path}...")
     try:
@@ -133,6 +221,34 @@ def run_gate_check(
             for f in findings
             if f.get("category") == category
         ]
+
+    # --- Identity Contract (CloudForge Identity Contract v1 §8) ---
+    # Opt-in via identity_contract_root, same pattern as schema_checks /
+    # enable_traceability elsewhere in this file: omitting it means
+    # SKIPPED, never an implicit scan of whatever spec_path's directory
+    # happens to be (see _run_identity_contract's docstring for why that
+    # was wrong). Callers gating a real Studio (reusable-gate.yml) must
+    # pass the Studio's checkout root explicitly.
+    if identity_contract_root:
+        studio_root = Path(identity_contract_root).resolve()
+        print(f"[*] Running identity-contract validator against {studio_root}...")
+        ic_result, ic_findings = _run_identity_contract(studio_root)
+    else:
+        ic_result, ic_findings = (
+            ValidatorResult(
+                validator_name="identity-contract",
+                state=ValidationState.SKIPPED,
+                findings_count=0,
+                error_message=None,
+            ),
+            [],
+        )
+    results.append(ic_result)
+    domain_findings["identity-contract"] = ic_findings
+    print(
+        f"[*] identity-contract -> {ic_result.state.value}"
+        + (f" ({ic_result.findings_count} findings)" if ic_result.findings_count else "")
+    )
 
     engine = GateDecisionEngine(policy_data)
     decision = engine.evaluate(run_id=validation_result["execution"]["execution_id"], results=results)
@@ -226,6 +342,12 @@ def main():
                               "for why (no rule in the registry has requirement_id mapped yet).")
     parser.add_argument("--requirements", default="rules/requirements.json",
                          help="Path to the requirement catalogue JSON used by the traceability domain")
+    parser.add_argument("--identity-contract-root", default=None, metavar="PATH",
+                         help="Run the identity-contract domain (CloudForge Identity Contract v1 §8) "
+                              "against PATH (a Studio repo checkout root). Off by default (SKIPPED) — "
+                              "must be passed explicitly, since guessing a target from --spec's "
+                              "directory previously scanned this engine's own repo when no real "
+                              "Studio was being gated.")
     args = parser.parse_args()
 
     schema_checks = None
@@ -250,6 +372,7 @@ def main():
         schema_checks=schema_checks,
         enable_traceability=args.check_traceability,
         requirements_path=args.requirements,
+        identity_contract_root=args.identity_contract_root,
     ))
 
 

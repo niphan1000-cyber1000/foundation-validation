@@ -19,6 +19,9 @@ rules:
   traceability:
     on_fail: BLOCK
     on_error: BLOCK
+  identity-contract:
+    on_fail: BLOCK
+    on_error: BLOCK
   trivy:
     on_fail: WARN
     on_error: BLOCK

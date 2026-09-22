@@ -117,12 +117,19 @@ jobs:
       # Install Spectral globally so the engine does not have to `npx --yes`
       # download @stoplight/spectral-cli on every run (that path timed out at
       # 120s on GitHub-hosted runners). npx will reuse the global binary.
-      - name: Install Spectral CLI
-        run: npm install -g @stoplight/spectral-cli
+      - name: Install Spectral CLI (pinned)
+        run: npm install -g @stoplight/spectral-cli@6.16.2
 
-      - name: Install OPA CLI
+      - name: Install OPA CLI (pinned + checksum)
         run: |
-          curl -L -o opa https://openpolicyagent.org/downloads/v0.55.0/opa_linux_amd64_static
+          set -euo pipefail
+          OPA_VERSION="v0.55.0"
+          # Self-verify this SHA256 against the official .sha256 on the OPA
+          # GitHub release before merging to production.
+          OPA_SHA256="388af161328871b943306f1ba7948658810a9fcf9c3c0a27bdfac6e8086617a9"
+          curl -L -o opa \
+            "https://github.com/open-policy-agent/opa/releases/download/${OPA_VERSION}/opa_linux_amd64_static"
+          echo "${OPA_SHA256}  opa" | sha256sum -c -
           chmod +x opa
           sudo mv opa /usr/local/bin/opa
 
@@ -141,7 +148,8 @@ jobs:
             --registry "rules/registry.yaml,../foundation/rules/registry.yaml" \
             --ruleset "../foundation/.spectral.yaml" \
             --foundation-sha "${{ steps.foundation_meta.outputs.sha }}" \
-            --env "${{ inputs.environment }}"
+            --env "${{ inputs.environment }}" \
+            --identity-contract-root ".."
 
       - name: Upload evidence chain
         if: always()
